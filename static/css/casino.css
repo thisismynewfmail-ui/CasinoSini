@@ -368,18 +368,6 @@ body.mode-signup .login-mode-tag {
 
 .form-actions { margin-top: 22px; display: flex; justify-content: flex-end; }
 
-/* A quiet, honest footer note shared by sign-in. */
-.play-note {
-  margin-top: 22px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text-faint);
-  text-align: center;
-}
-.play-note b { color: var(--text-secondary); font-weight: 600; }
-
 /* =========================================================================
    Restricted / forbidden page
    ========================================================================= */
