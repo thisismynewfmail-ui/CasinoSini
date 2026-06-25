@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.pyc
+
+# Server-generated session secret (do not commit)
+data/.session_secret
+
+# OS
+.DS_Store
