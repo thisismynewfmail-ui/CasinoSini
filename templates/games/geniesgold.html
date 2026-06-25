@@ -286,6 +286,152 @@
   .jackpot-value { font-size: 12px; }
   .spin-btn { width: 56px; height: 56px; font-size: 20px; }
 }
+
+/* =========================================================================
+   REDESIGN OVERRIDES — a framed neon "cabinet" wraps the reels (jackpot
+   marquee on top, loyalty meter below), so the eye lands reels-first, then
+   the prize ceiling, then the Genie's Gold loyalty progress that rewards
+   continued play. Later rules win the cascade, so the original sizing logic
+   the canvas depends on is untouched.
+   ========================================================================= */
+.gg-page { max-width: 560px; }
+
+/* The cabinet shell */
+.cabinet {
+  width: 100%;
+  border-radius: 22px;
+  padding: 14px 14px 16px;
+  margin-bottom: 14px;
+  background:
+    linear-gradient(180deg, rgba(217,70,239,0.10), rgba(13,17,23,0.6) 38%),
+    var(--bg-card);
+  border: 1px solid rgba(217,70,239,0.30);
+  box-shadow:
+    0 0 0 1px rgba(255,210,74,0.10) inset,
+    0 24px 60px rgba(0,0,0,0.55),
+    0 0 50px rgba(217,70,239,0.18);
+  position: relative;
+}
+/* corner bolts for the cabinet, cyberpunk-cabinet flavour */
+.cabinet::before, .cabinet::after {
+  content: ''; position: absolute; width: 7px; height: 7px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, rgba(217,70,239,0.6) 60%, transparent);
+  top: 10px;
+}
+.cabinet::before { left: 10px; }
+.cabinet::after { right: 10px; }
+
+/* Marquee title */
+.cabinet-marquee {
+  display: flex; align-items: center; gap: 12px;
+  justify-content: center; padding: 4px 0 12px;
+}
+.cabinet-marquee .marquee-side {
+  flex: 1; height: 1px; max-width: 90px;
+  background: linear-gradient(90deg, transparent, rgba(255,210,74,0.6), transparent);
+}
+.cabinet-marquee .marquee-title {
+  font-size: 22px; font-weight: 900; letter-spacing: 0.04em; white-space: nowrap;
+  background: linear-gradient(135deg, #ffe27a, var(--accent-gold) 45%, #d946ef);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 18px rgba(217,70,239,0.5));
+}
+
+/* Jackpot marquee — taller glowing meters */
+.gg-page .jackpot-bar { max-width: none; margin: 0 0 12px; gap: 8px; }
+.gg-page .jackpot-item {
+  padding: 9px 4px 8px; border-radius: 12px; border-width: 1px;
+  background: rgba(0,0,0,0.35);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.gg-page .jackpot-item::before { opacity: 0.18; }
+.gg-page .jackpot-item:hover { transform: translateY(-2px); }
+.gg-page .jackpot-item.grand:hover { box-shadow: 0 8px 22px rgba(255,210,74,0.30); }
+.gg-page .jackpot-label { font-size: 9px; margin-bottom: 3px; }
+.gg-page .jackpot-value { font-size: 15px; letter-spacing: -0.01em; }
+
+/* Reel frame inside the cabinet */
+.reel-frame {
+  border-radius: 14px;
+  padding: 6px;
+  background: linear-gradient(160deg, rgba(217,70,239,0.25), rgba(99,102,241,0.12) 50%, rgba(255,210,74,0.12));
+}
+.gg-page .reel-wrap {
+  max-width: none; width: 100%; margin: 0;
+  border: 1.5px solid rgba(217,70,239,0.35);
+  box-shadow: inset 0 0 50px rgba(0,0,0,0.55), 0 0 24px rgba(217,70,239,0.12);
+}
+
+/* Genie's Gold loyalty meter (tiered rewards, immediate feedback) */
+.loyalty {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.30);
+  border: 1px solid rgba(255,210,74,0.22);
+}
+.loyalty-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px;
+}
+.loyalty-name {
+  font-size: 12px; font-weight: 800; color: var(--accent-gold);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.loyalty-tier {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  color: #ecaffb; padding: 2px 9px; border-radius: var(--radius-pill);
+  background: rgba(217,70,239,0.16); border: 1px solid rgba(217,70,239,0.35);
+}
+.loyalty-bar {
+  height: 12px; border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.06); overflow: hidden; position: relative;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.loyalty-fill {
+  height: 100%; width: 0%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--accent-amber), var(--accent-gold) 60%, #fff7d6);
+  box-shadow: 0 0 14px rgba(255,210,74,0.6);
+  transition: width 0.6s var(--ease);
+  position: relative;
+}
+.loyalty-fill::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+  transform: translateX(-100%); animation: loyaltyShine 2.4s ease-in-out infinite;
+}
+@keyframes loyaltyShine { 0% { transform: translateX(-100%);} 60%,100% { transform: translateX(220%);} }
+.loyalty-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 8px; gap: 10px; min-height: 24px;
+}
+.loyalty-foot #loyaltyLabel { font-size: 11px; color: var(--text-secondary); }
+.loyalty-claim {
+  padding: 6px 16px; min-height: 32px;
+  font-family: var(--font-main); font-size: 12px; font-weight: 800; color: #052e16;
+  border: none; border-radius: var(--radius-pill); cursor: pointer;
+  background: linear-gradient(135deg, #4ef08a, var(--accent-green) 55%, #15a34a);
+  box-shadow: 0 4px 16px rgba(46,224,106,0.45);
+  transition: transform 0.12s var(--ease), filter 0.2s var(--ease);
+  animation: ctaPulseGreen 1.8s ease-in-out infinite;
+}
+.loyalty-claim:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.loyalty-claim:active { transform: scale(0.97); }
+@keyframes ctaPulseGreen {
+  0%,100% { box-shadow: 0 4px 16px rgba(46,224,106,0.45); }
+  50% { box-shadow: 0 4px 26px rgba(46,224,106,0.8); }
+}
+
+/* Spin button: make the primary action unmistakably dominant */
+.gg-page .spin-btn {
+  width: 72px; height: 72px; font-size: 26px;
+  background: radial-gradient(circle at 50% 35%, rgba(255,231,122,0.35), rgba(217,70,239,0.20) 70%);
+  color: #fff;
+}
+.gg-page .controls-row { max-width: none; }
+
+/* Function-based control colours: utility toggles stay neutral until armed */
+.gg-page .turbo-btn, .gg-page .power-btn, .gg-page .auto-btn { min-height: 40px; }
 </style>
 </head>
 <body>
@@ -303,38 +449,59 @@
   </div>
 </div>
 
-<div class="page active">
-  <div class="game-title">&#129668; Genie's Gold</div>
-  <div class="game-subtitle">5 reels. Free spins. Progressive jackpots. The genie grants wishes.</div>
+<div class="page active gg-page">
 
-  <div class="jackpot-bar" id="jackpotBar">
-    <div class="jackpot-item grand">
-      <div class="jackpot-label">Grand</div>
-      <div class="jackpot-value" id="jackpotGrand">$5,000</div>
+  <div class="cabinet">
+    <div class="cabinet-marquee">
+      <span class="marquee-side"></span>
+      <span class="marquee-title">&#129668; GENIE'S GOLD</span>
+      <span class="marquee-side"></span>
     </div>
-    <div class="jackpot-item major">
-      <div class="jackpot-label">Major</div>
-      <div class="jackpot-value" id="jackpotMajor">$500</div>
-    </div>
-    <div class="jackpot-item minor">
-      <div class="jackpot-label">Minor</div>
-      <div class="jackpot-value" id="jackpotMinor">$100</div>
-    </div>
-    <div class="jackpot-item mini">
-      <div class="jackpot-label">Mini</div>
-      <div class="jackpot-value" id="jackpotMini">$25</div>
-    </div>
-  </div>
 
-  <div class="reel-wrap" id="reelWrap">
-    <canvas id="reelCanvas"></canvas>
-    <div class="dismissible-banner free-spins-banner" id="freeSpinsBanner">
-      <h3>&#10024; FREE SPINS &#10024;</h3>
-      <p id="freeSpinsInfo">8 Free Spins - All wins 2x!</p>
-      <div class="dismiss-hint">tap to dismiss</div>
+    <div class="jackpot-bar" id="jackpotBar">
+      <div class="jackpot-item grand">
+        <div class="jackpot-label">Grand</div>
+        <div class="jackpot-value" id="jackpotGrand">$5,000</div>
+      </div>
+      <div class="jackpot-item major">
+        <div class="jackpot-label">Major</div>
+        <div class="jackpot-value" id="jackpotMajor">$500</div>
+      </div>
+      <div class="jackpot-item minor">
+        <div class="jackpot-label">Minor</div>
+        <div class="jackpot-value" id="jackpotMinor">$100</div>
+      </div>
+      <div class="jackpot-item mini">
+        <div class="jackpot-label">Mini</div>
+        <div class="jackpot-value" id="jackpotMini">$25</div>
+      </div>
     </div>
-    <div class="dismissible-banner genie-blessing" id="genieBlessing">&#129668; Genie's Blessing!</div>
-    <div class="dismissible-banner mini-win-display" id="miniWinDisplay"></div>
+
+    <div class="reel-frame">
+      <div class="reel-wrap" id="reelWrap">
+        <canvas id="reelCanvas"></canvas>
+        <div class="dismissible-banner free-spins-banner" id="freeSpinsBanner">
+          <h3>&#10024; FREE SPINS &#10024;</h3>
+          <p id="freeSpinsInfo">8 Free Spins - All wins 2x!</p>
+          <div class="dismiss-hint">tap to dismiss</div>
+        </div>
+        <div class="dismissible-banner genie-blessing" id="genieBlessing">&#129668; Genie's Blessing!</div>
+        <div class="dismissible-banner mini-win-display" id="miniWinDisplay"></div>
+      </div>
+    </div>
+
+    <!-- Genie's Gold loyalty: real wager-earned tiers, instant claim feedback -->
+    <div class="loyalty" id="loyalty">
+      <div class="loyalty-head">
+        <span class="loyalty-name">&#129668; Genie's Gold Loyalty</span>
+        <span class="loyalty-tier" id="loyaltyTier">Tier 0</span>
+      </div>
+      <div class="loyalty-bar"><div class="loyalty-fill" id="loyaltyFill"></div></div>
+      <div class="loyalty-foot">
+        <span id="loyaltyLabel">Every spin fills the meter &mdash; cash in at the top.</span>
+        <button class="loyalty-claim" id="loyaltyClaim" style="display:none">Claim</button>
+      </div>
+    </div>
   </div>
 
   <div class="bet-area">
@@ -1077,6 +1244,7 @@ window.__APP__ = {
 
   function scheduleNext(autoContinue) {
     if (freeSpinsLeft > 0) return;
+    if (window.__refreshLoyalty) window.__refreshLoyalty();
     if (autoContinue) {
       setTimeout(function() { doSpin(); }, turboMode ? 200 : 500);
     } else {
@@ -1318,6 +1486,69 @@ window.__APP__ = {
   fetchJackpots();
   setInterval(fetchJackpots, 30000);
   GS.setFromData(window.__APP__);
+})();
+</script>
+
+<script>
+/* Genie's Gold Loyalty — a real, wager-earned progress meter. The bar tracks
+   lifetime wagering against server-defined tiers; crossing a tier readies a
+   genuine token reward the player claims for instant feedback. No fabricated
+   numbers: everything comes from /api/loyalty. */
+(function() {
+  'use strict';
+  const fill = document.getElementById('loyaltyFill');
+  const tierEl = document.getElementById('loyaltyTier');
+  const labelEl = document.getElementById('loyaltyLabel');
+  const claimBtn = document.getElementById('loyaltyClaim');
+  if (!fill) return;
+  let busy = false;
+
+  function render(L) {
+    tierEl.textContent = 'Tier ' + (L.claimed_tier || 0);
+    if (L.pending_tiers > 0) {
+      fill.style.width = '100%';
+      claimBtn.style.display = 'inline-block';
+      claimBtn.textContent = 'Claim +$' + (L.pending_reward).toLocaleString();
+      labelEl.innerHTML = '<b style="color:var(--accent-gold)">Reward ready!</b> ' +
+        L.pending_tiers + ' tier' + (L.pending_tiers > 1 ? 's' : '') + ' earned.';
+    } else {
+      const pct = Math.max(2, Math.round((L.progress || 0) * 100));
+      fill.style.width = pct + '%';
+      claimBtn.style.display = 'none';
+      labelEl.textContent = '$' + (L.to_next).toLocaleString() + ' wagered to next reward (+$' +
+        (L.reward).toLocaleString() + ')';
+    }
+  }
+
+  function refresh() {
+    fetch('/api/loyalty', { credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if (d.ok) render(d.loyalty); })
+      .catch(function(){});
+  }
+  window.__refreshLoyalty = refresh;
+
+  claimBtn.addEventListener('click', function() {
+    if (busy) return;
+    busy = true;
+    claimBtn.disabled = true;
+    fetch('/api/loyalty/claim', { method: 'POST', credentials: 'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        busy = false; claimBtn.disabled = false;
+        if (d.ok) {
+          CasinoEngine.GameState.setBalance(d.tokens);
+          if (CasinoEngine.sound && CasinoEngine.sound.win) CasinoEngine.sound.win();
+          if (CasinoEngine.ParticleSystem) new CasinoEngine.ParticleSystem().burst(36, ['#ffd700','#2ee06a','#ffe27a']);
+          render(d.loyalty);
+        } else if (d.loyalty) {
+          render(d.loyalty);
+        }
+      })
+      .catch(function(){ busy = false; claimBtn.disabled = false; });
+  });
+
+  refresh();
 })();
 </script>
 </body>

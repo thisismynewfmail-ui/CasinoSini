@@ -458,6 +458,148 @@ def create_app(base_dir: str) -> Flask:
             "stats": stats,
         })
 
+    # ----------------------- Engagement: bonus / loyalty / leaderboard -----
+    #
+    # These three endpoints power the behavioural hooks the lobby and Genie's
+    # Gold lean on — but every number they return is REAL. The leaderboard is
+    # the actual standings, the daily bonus actually credits the account, and
+    # loyalty tiers are earned against real lifetime wagering (stats.total_
+    # wagered). Nothing here fabricates scarcity or social proof.
+
+    def _today_str() -> str:
+        return time.strftime("%Y-%m-%d", time.localtime())
+
+    def _yesterday_str() -> str:
+        return time.strftime("%Y-%m-%d", time.localtime(time.time() - 86400))
+
+    def _daily_bonus_amount() -> int:
+        return int(get_config().get("casino", {}).get("daily_bonus", 250))
+
+    def _loyalty_cfg() -> Dict[str, int]:
+        casino = get_config().get("casino", {})
+        return {
+            "tier_size": int(casino.get("loyalty_tier_size", 2000)),
+            "reward": int(casino.get("loyalty_reward", 200)),
+        }
+
+    def _bonus_state(rec: Dict[str, Any]) -> Dict[str, Any]:
+        last = rec.get("last_bonus", "") or ""
+        streak = int(rec.get("bonus_streak", 0) or 0)
+        available = last != _today_str()
+        return {
+            "available": available,
+            "amount": _daily_bonus_amount(),
+            "streak": streak,
+            "last_claimed": last,
+        }
+
+    def _loyalty_state(rec: Dict[str, Any]) -> Dict[str, Any]:
+        cfg = _loyalty_cfg()
+        tier_size = max(1, cfg["tier_size"])
+        wagered = int(utils.get_stats(rec["username"]).get("total_wagered", 0) or 0)
+        earned_tier = wagered // tier_size
+        claimed_tier = int(rec.get("loyalty_claimed_tier", 0) or 0)
+        pending = max(0, earned_tier - claimed_tier)
+        into_tier = wagered - earned_tier * tier_size
+        return {
+            "wagered": wagered,
+            "tier_size": tier_size,
+            "reward": cfg["reward"],
+            "earned_tier": earned_tier,
+            "claimed_tier": claimed_tier,
+            "pending_tiers": pending,
+            "pending_reward": pending * cfg["reward"],
+            "progress": round(into_tier / tier_size, 4),
+            "to_next": tier_size - into_tier,
+        }
+
+    @app.get("/api/daily_bonus")
+    def api_daily_bonus_status():
+        rec = _require_user()
+        if not rec:
+            return _json_error("Not logged in.", 401)
+        return jsonify({"ok": True, "bonus": _bonus_state(rec)})
+
+    @app.post("/api/daily_bonus")
+    def api_daily_bonus_claim():
+        rec = _require_user()
+        if not rec:
+            return _json_error("Not logged in.", 401)
+        today = _today_str()
+        if rec.get("last_bonus", "") == today:
+            return jsonify({"ok": False, "error": "Already claimed today.",
+                            "bonus": _bonus_state(rec),
+                            "tokens": utils.get_tokens(rec["username"])})
+        streak = int(rec.get("bonus_streak", 0) or 0)
+        streak = streak + 1 if rec.get("last_bonus", "") == _yesterday_str() else 1
+        amount = _daily_bonus_amount()
+        # A modest streak kicker, capped — rewards returning without runaway.
+        amount += min(streak - 1, 6) * 25
+        rec["last_bonus"] = today
+        rec["bonus_streak"] = streak
+        utils.save_user(rec)
+        new_tokens = utils.add_tokens(rec["username"], amount)
+        return jsonify({"ok": True, "tokens": new_tokens, "amount": amount,
+                        "streak": streak, "bonus": _bonus_state(utils.load_user(rec["username"]))})
+
+    @app.get("/api/loyalty")
+    def api_loyalty_status():
+        rec = _require_user()
+        if not rec:
+            return _json_error("Not logged in.", 401)
+        return jsonify({"ok": True, "loyalty": _loyalty_state(rec)})
+
+    @app.post("/api/loyalty/claim")
+    def api_loyalty_claim():
+        rec = _require_user()
+        if not rec:
+            return _json_error("Not logged in.", 401)
+        state = _loyalty_state(rec)
+        if state["pending_tiers"] <= 0:
+            return jsonify({"ok": False, "error": "No reward ready yet.",
+                            "loyalty": state,
+                            "tokens": utils.get_tokens(rec["username"])})
+        reward = state["pending_reward"]
+        rec["loyalty_claimed_tier"] = state["earned_tier"]
+        utils.save_user(rec)
+        new_tokens = utils.add_tokens(rec["username"], reward)
+        fresh = utils.load_user(rec["username"])
+        return jsonify({"ok": True, "tokens": new_tokens, "reward": reward,
+                        "loyalty": _loyalty_state(fresh)})
+
+    @app.get("/api/leaderboard")
+    def api_leaderboard():
+        rec = _require_user()
+        if not rec:
+            return _json_error("Not logged in.", 401)
+        active = set(_active_users())
+        rows = []
+        for u in utils.list_users():
+            uname = u.get("username") or ""
+            s = utils.get_stats(uname)
+            rows.append({
+                "username": uname,
+                "name": u.get("name") or uname,
+                "tokens": int(u.get("tokens", 0) or 0),
+                "wins": s.get("wins", 0),
+                "biggest": int(s.get("total_won", 0) or 0),
+                "avatar_ts": u.get("avatar_ts", 0) or 0,
+                "active": uname in active,
+            })
+        rows.sort(key=lambda r: r["tokens"], reverse=True)
+        for i, r in enumerate(rows):
+            r["rank"] = i + 1
+        me = rec.get("username")
+        my_rank = next((r["rank"] for r in rows if r["username"] == me), None)
+        return jsonify({
+            "ok": True,
+            "leaderboard": rows[:8],
+            "total_players": len(rows),
+            "active_now": len(active),
+            "me": me,
+            "my_rank": my_rank,
+        })
+
     @app.post("/api/reset_tokens")
     def api_reset_tokens():
         rec = _require_user()

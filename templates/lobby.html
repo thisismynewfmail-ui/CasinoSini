@@ -6,6 +6,17 @@
 <title>Neon Casino</title>
 <script src="{{ url_for('static', filename='js/engine.js') }}"></script>
 <style>
+/* =========================================================================
+   LOBBY — the layout is a deliberate top-to-bottom conversion funnel:
+     1. Bankroll (anchor, gold)         what you have
+     2. Daily bonus (reciprocity)       a free gift to open the session
+     3. Featured flagship (aspiration)  the highest-ceiling game + live jackpot
+     4. Game grid (choice)              secondary games, neutral until hover
+     5. Leaderboard (social proof)      real standings + who's online now
+   Colour does the work: only the two CTAs the user should act on first —
+   Claim and Play Featured — wear high-saturation fills. Everything else is
+   neutral and only lights up on hover, so the eye is never split.
+   ========================================================================= */
 .lobby-bg {
   position: fixed; inset: 0; z-index: -1;
   background:
@@ -29,176 +40,270 @@
   0% { background-position: 0% 0%, 100% 0%, 50% 0%, 50% 100%; }
   100% { background-position: 6% 12%, 92% 14%, 46% 92%, 50% 88%; }
 }
-.lobby-header {
-  text-align: center;
-  padding: 96px 16px 8px;
-}
-.lobby-header h1 {
-  font-size: 40px;
-  font-weight: 900;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, #fff 10%, var(--accent-gold) 50%, var(--accent-amber));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(0 2px 18px rgba(255,210,74,0.30));
-}
-.lobby-header p {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin-top: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-}
-.lobby-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  padding: 20px 16px 40px;
-  max-width: 420px;
+
+.lobby-shell {
   width: 100%;
-}
-@media (min-width: 480px) {
-  .lobby-grid { grid-template-columns: 1fr 1fr; max-width: 600px; }
-}
-.game-card {
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.05), transparent 42%),
-    var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: 28px 20px;
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 84px 16px 56px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-  border: 1px solid var(--line);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.40);
-  transition: transform 0.28s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.28s ease, border-color 0.28s ease;
-  position: relative;
-  overflow: hidden;
+  gap: 18px;
 }
-.game-card::before {
-  content: '';
-  position: absolute; inset: 0;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  border-radius: inherit;
-  pointer-events: none;
-}
-.game-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 22px 50px rgba(0,0,0,0.55);
-}
-.game-card:hover::before { opacity: 1; }
-.game-card:active {
-  transform: translateY(-3px) scale(0.99);
-}
-.game-card .card-icon {
-  font-size: 46px;
-  line-height: 1;
-  margin-bottom: 4px;
-  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5));
-  transition: transform 0.28s var(--ease);
-}
-.game-card:hover .card-icon { transform: scale(1.12) translateY(-2px); }
-.game-card .card-name {
-  font-size: 18px;
-  font-weight: 700;
-}
-.game-card .card-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-.game-card .card-badge {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-  margin-top: 4px;
-}
-.game-card .card-play {
-  margin-top: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 20px;
-  border-radius: var(--radius-pill);
-  background: rgba(255,255,255,0.06);
-  transition: background 0.2s ease;
-}
-.game-card:hover .card-play {
-  background: rgba(99,102,241,0.2);
-}
-/* Per-game identities — each card lights up in its own neon on hover. */
-.game-card.crash::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(168,85,247,0.20), transparent 70%); }
-.game-card.crash .card-badge { background: rgba(168,85,247,0.22); color: #c4a8ff; }
-.game-card.crash:hover { border-color: rgba(168,85,247,0.55); box-shadow: 0 22px 50px rgba(168,85,247,0.30); }
 
-.game-card.mines::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(34,211,238,0.18), transparent 70%); }
-.game-card.mines .card-badge { background: rgba(34,211,238,0.22); color: #67e8f9; }
-.game-card.mines:hover { border-color: rgba(34,211,238,0.55); box-shadow: 0 22px 50px rgba(34,211,238,0.28); }
-
-.game-card.plinko::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(244,114,208,0.18), transparent 70%); }
-.game-card.plinko .card-badge { background: rgba(244,114,208,0.22); color: #f9a8e0; }
-.game-card.plinko:hover { border-color: rgba(244,114,208,0.55); box-shadow: 0 22px 50px rgba(244,114,208,0.28); }
-
-.game-card.wheel::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255,210,74,0.18), transparent 70%); }
-.game-card.wheel .card-badge { background: rgba(255,210,74,0.22); color: #ffd24a; }
-.game-card.wheel:hover { border-color: rgba(255,210,74,0.55); box-shadow: 0 22px 50px rgba(255,210,74,0.28); }
-
-.game-card.geniesgold::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(217,70,239,0.18), transparent 70%); }
-.game-card.geniesgold .card-badge { background: rgba(217,70,239,0.22); color: #ecaffb; }
-.game-card.geniesgold:hover { border-color: rgba(217,70,239,0.55); box-shadow: 0 22px 50px rgba(217,70,239,0.28); }
+/* ---- 1. Identity / greeting ---- */
+.lobby-hero { text-align: center; margin-bottom: 2px; }
 .lobby-user {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 4px;
+  margin-bottom: 10px;
+  padding: 5px 14px 5px 5px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
 }
 .lobby-user-avatar {
-  width: 32px; height: 32px;
+  width: 30px; height: 30px;
   border-radius: 50%;
   background: var(--bg-card);
-  border: 1.5px solid rgba(255,255,255,0.08);
-  overflow: hidden;
-  flex-shrink: 0;
+  border: 1.5px solid rgba(255,255,255,0.10);
+  overflow: hidden; flex-shrink: 0;
 }
-.lobby-user-avatar img {
-  width: 100%; height: 100%;
-  object-fit: cover;
-}
-.lobby-user-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
+.lobby-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.lobby-user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
 .lobby-user-role {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 1px 6px;
-  border-radius: var(--radius-pill);
-  background: rgba(99,102,241,0.15);
-  color: #a78bfa;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+  background: rgba(99,102,241,0.18); color: #a78bfa;
+}
+.lobby-hero h1 {
+  font-size: 38px; font-weight: 900; letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #fff 10%, var(--accent-gold) 50%, var(--accent-amber));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 18px rgba(255,210,74,0.30));
+}
+.lobby-hero p {
+  color: var(--text-secondary); font-size: 12px; margin-top: 6px;
+  text-transform: uppercase; letter-spacing: 0.22em;
 }
 .signout-link {
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: none;
-  margin-left: 8px;
+  color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  text-decoration: none; margin-left: 8px;
 }
-.signout-link:hover {
-  color: var(--accent-red);
+.signout-link:hover { color: var(--accent-red); }
+
+/* ---- 2. Daily bonus (reciprocity) ---- */
+.bonus-card {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,210,74,0.32);
+  background:
+    radial-gradient(ellipse 60% 120% at 0% 50%, rgba(255,210,74,0.14), transparent 70%),
+    var(--bg-card);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.40);
+  position: relative; overflow: hidden;
+}
+.bonus-card.claimed { border-color: var(--line); opacity: 0.82; }
+.bonus-icon {
+  font-size: 34px; line-height: 1; flex-shrink: 0;
+  filter: drop-shadow(0 4px 14px rgba(255,210,74,0.5));
+  animation: bonusFloat 2.6s ease-in-out infinite;
+}
+.bonus-card.claimed .bonus-icon { animation: none; filter: grayscale(0.4) brightness(0.8); }
+@keyframes bonusFloat { 0%,100%{transform:translateY(0) rotate(-4deg);} 50%{transform:translateY(-5px) rotate(4deg);} }
+.bonus-text { flex: 1; min-width: 0; }
+.bonus-title { font-size: 15px; font-weight: 800; color: var(--text-primary); }
+.bonus-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+.bonus-sub b { color: var(--accent-gold); }
+.bonus-streak {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 6px; font-size: 11px; color: var(--accent-amber);
+}
+.bonus-cta {
+  flex-shrink: 0; padding: 12px 22px; min-height: 46px;
+  font-family: var(--font-main); font-size: 14px; font-weight: 800;
+  letter-spacing: 0.02em; color: #1a1004; cursor: pointer;
+  border: none; border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #ffe27a, var(--accent-gold) 45%, var(--accent-amber));
+  box-shadow: 0 6px 20px rgba(255,210,74,0.42), inset 0 1px 0 rgba(255,255,255,0.5);
+  transition: transform 0.12s var(--ease), box-shadow 0.2s var(--ease), filter 0.2s var(--ease);
+  animation: ctaPulse 2.2s ease-in-out infinite;
+}
+.bonus-cta:hover { transform: translateY(-2px); filter: brightness(1.05); box-shadow: 0 10px 30px rgba(255,210,74,0.6), inset 0 1px 0 rgba(255,255,255,0.5); }
+.bonus-cta:active { transform: translateY(0) scale(0.97); }
+.bonus-cta:disabled, .bonus-card.claimed .bonus-cta {
+  background: rgba(255,255,255,0.06); color: var(--text-faint);
+  box-shadow: none; cursor: default; animation: none; transform: none;
+}
+@keyframes ctaPulse {
+  0%,100% { box-shadow: 0 6px 20px rgba(255,210,74,0.42), inset 0 1px 0 rgba(255,255,255,0.5); }
+  50% { box-shadow: 0 6px 30px rgba(255,210,74,0.75), inset 0 1px 0 rgba(255,255,255,0.5); }
 }
 
+/* ---- 3. Featured flagship ---- */
+.featured {
+  display: block; text-decoration: none; color: inherit;
+  position: relative; overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(217,70,239,0.4);
+  background:
+    radial-gradient(ellipse 90% 70% at 80% 0%, rgba(217,70,239,0.26), transparent 62%),
+    radial-gradient(ellipse 70% 60% at 0% 100%, rgba(255,210,74,0.14), transparent 60%),
+    var(--bg-card);
+  box-shadow: 0 16px 44px rgba(0,0,0,0.5);
+  transition: transform 0.28s var(--ease), box-shadow 0.28s var(--ease), border-color 0.28s var(--ease);
+}
+.featured:hover { transform: translateY(-5px); border-color: rgba(217,70,239,0.7); box-shadow: 0 26px 60px rgba(217,70,239,0.32); }
+.featured-tag {
+  position: absolute; top: 14px; left: 16px;
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.14em;
+  padding: 4px 10px; border-radius: var(--radius-pill);
+  color: #ffd24a; background: rgba(255,210,74,0.12); border: 1px solid rgba(255,210,74,0.4);
+}
+.featured-live {
+  position: absolute; top: 14px; right: 16px;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+  color: var(--accent-green); text-transform: uppercase;
+}
+.featured-live .dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green); animation: pulse 1.6s ease infinite;
+}
+.featured-body { padding: 46px 22px 22px; display: flex; align-items: center; gap: 20px; }
+.featured-emoji {
+  font-size: 60px; line-height: 1; flex-shrink: 0;
+  filter: drop-shadow(0 8px 22px rgba(217,70,239,0.5));
+}
+.featured-main { flex: 1; min-width: 0; }
+.featured-name { font-size: 24px; font-weight: 900; letter-spacing: -0.02em; color: #ecaffb; }
+.featured-desc { font-size: 12.5px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4; }
+.jackpot-teaser {
+  display: flex; align-items: baseline; gap: 8px; margin-top: 12px;
+  padding: 10px 14px; border-radius: var(--radius-md);
+  background: rgba(0,0,0,0.30); border: 1px solid rgba(255,210,74,0.25);
+}
+.jackpot-teaser .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--accent-gold); }
+.jackpot-teaser .val {
+  font-family: var(--font-mono); font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: #fff; text-shadow: 0 0 22px rgba(255,210,74,0.55); margin-left: auto;
+}
+.featured-cta {
+  margin-top: 16px; width: 100%;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px; min-height: 52px;
+  font-size: 16px; font-weight: 800; letter-spacing: 0.02em; color: #fff;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--accent-purple), #d946ef 60%, #ec4899);
+  box-shadow: 0 8px 26px rgba(217,70,239,0.5);
+  transition: filter 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.featured:hover .featured-cta { filter: brightness(1.08); box-shadow: 0 12px 36px rgba(217,70,239,0.7); }
+@media (max-width: 480px) {
+  .featured-body { flex-direction: column; text-align: center; }
+  .jackpot-teaser .val { font-size: 22px; }
+}
+
+/* ---- 4. Game grid (secondary) ---- */
+.section-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--text-faint); margin: 6px 2px -4px;
+}
+.lobby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (min-width: 560px) { .lobby-grid { grid-template-columns: 1fr 1fr; } }
+.game-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), transparent 42%), var(--bg-card);
+  border-radius: var(--radius-lg); padding: 22px 18px; cursor: pointer;
+  text-decoration: none; color: inherit; display: flex; flex-direction: column;
+  align-items: center; text-align: center; gap: 7px;
+  border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.40);
+  transition: transform 0.28s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.28s ease, border-color 0.28s ease;
+  position: relative; overflow: hidden;
+}
+.game-card::before { content:''; position:absolute; inset:0; opacity:0; transition:opacity 0.3s ease; border-radius:inherit; pointer-events:none; }
+.game-card:hover { transform: translateY(-6px); box-shadow: 0 20px 46px rgba(0,0,0,0.55); }
+.game-card:hover::before { opacity: 1; }
+.game-card:active { transform: translateY(-2px) scale(0.99); }
+.game-card .card-icon {
+  font-size: 40px; line-height: 1; margin-bottom: 2px;
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5)); transition: transform 0.28s var(--ease);
+}
+.game-card:hover .card-icon { transform: scale(1.12) translateY(-2px); }
+.game-card .card-name { font-size: 16px; font-weight: 700; }
+.game-card .card-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; }
+.game-card .card-badge {
+  display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; padding: 3px 10px; border-radius: var(--radius-pill); margin-top: 2px;
+}
+.game-card .card-play {
+  margin-top: 6px; font-size: 12px; font-weight: 600; padding: 7px 18px;
+  border-radius: var(--radius-pill); background: rgba(255,255,255,0.06); transition: background 0.2s ease;
+}
+.game-card.crash::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(168,85,247,0.20), transparent 70%); }
+.game-card.crash .card-badge { background: rgba(168,85,247,0.22); color: #c4a8ff; }
+.game-card.crash:hover { border-color: rgba(168,85,247,0.55); box-shadow: 0 20px 46px rgba(168,85,247,0.30); }
+.game-card.crash:hover .card-play { background: rgba(168,85,247,0.22); }
+.game-card.mines::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(34,211,238,0.18), transparent 70%); }
+.game-card.mines .card-badge { background: rgba(34,211,238,0.22); color: #67e8f9; }
+.game-card.mines:hover { border-color: rgba(34,211,238,0.55); box-shadow: 0 20px 46px rgba(34,211,238,0.28); }
+.game-card.mines:hover .card-play { background: rgba(34,211,238,0.20); }
+.game-card.plinko::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(244,114,208,0.18), transparent 70%); }
+.game-card.plinko .card-badge { background: rgba(244,114,208,0.22); color: #f9a8e0; }
+.game-card.plinko:hover { border-color: rgba(244,114,208,0.55); box-shadow: 0 20px 46px rgba(244,114,208,0.28); }
+.game-card.plinko:hover .card-play { background: rgba(244,114,208,0.20); }
+.game-card.wheel::before { background: radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255,210,74,0.18), transparent 70%); }
+.game-card.wheel .card-badge { background: rgba(255,210,74,0.22); color: #ffd24a; }
+.game-card.wheel:hover { border-color: rgba(255,210,74,0.55); box-shadow: 0 20px 46px rgba(255,210,74,0.28); }
+.game-card.wheel:hover .card-play { background: rgba(255,210,74,0.20); }
+
+/* ---- 5. Leaderboard (real social proof) ---- */
+.board {
+  border-radius: var(--radius-lg); border: 1px solid var(--line);
+  background: var(--bg-card); box-shadow: 0 10px 30px rgba(0,0,0,0.40);
+  overflow: hidden;
+}
+.board-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--line);
+}
+.board-head h3 { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+.board-online {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--accent-green);
+}
+.board-online .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); animation: pulse 1.6s ease infinite; }
+.board-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 18px; border-bottom: 1px solid var(--line);
+  transition: background 0.15s ease;
+}
+.board-row:last-child { border-bottom: none; }
+.board-row:hover { background: rgba(255,255,255,0.02); }
+.board-row.me { background: rgba(99,102,241,0.10); }
+.board-rank {
+  width: 26px; flex-shrink: 0; text-align: center;
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text-faint);
+}
+.board-row.r1 .board-rank { color: #ffd24a; }
+.board-row.r2 .board-rank { color: #d4d4d8; }
+.board-row.r3 .board-rank { color: #f5a524; }
+.board-av {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: var(--bg-elevated); border: 1.5px solid var(--line-strong); overflow: hidden; position: relative;
+}
+.board-av img { width: 100%; height: 100%; object-fit: cover; }
+.board-av .online-pip {
+  position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--accent-green); border: 2px solid var(--bg-card);
+}
+.board-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board-name .you { font-size: 10px; color: var(--accent-indigo); margin-left: 6px; }
+.board-tokens { font-family: var(--font-mono); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-gold); flex-shrink: 0; }
+.board-foot { padding: 11px 18px; font-size: 11px; color: var(--text-faint); text-align: center; }
+.board-foot b { color: var(--text-secondary); }
+.board-empty { padding: 24px; text-align: center; color: var(--text-faint); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -209,65 +314,100 @@
     <span class="balance-value" data-value="{{ tokens }}">${{ tokens }}</span>
   </div>
   <div class="stats-wrap">
-    <span class="stat">&nbsp;<span class="stat-streak">{{ stats.streak }}</span></span>
+    <span class="stat">&#128293;<span class="stat-streak">{{ stats.streak }}</span></span>
     <span class="stat">W<span class="stat-wins">{{ stats.wins }}</span></span>
     <span class="stat">L<span class="stat-losses">{{ stats.losses }}</span></span>
     <span class="signout-link" onclick="fetch('/api/logout',{method:'POST',credentials:'same-origin'}).then(function(){window.location.href='/login'})">Sign out</span>
   </div>
 </div>
 
-<div class="lobby-header">
-  <div class="lobby-user">
-    <div class="lobby-user-avatar">
-      <img src="/api/user/profile_image/user?t={{ user.avatar_ts or 0 }}" alt="" onerror="this.style.display='none'">
+<div class="lobby-shell">
+
+  <!-- 1. Identity -->
+  <div class="lobby-hero">
+    <div class="lobby-user">
+      <div class="lobby-user-avatar">
+        <img src="/api/user/profile_image/user?t={{ user.avatar_ts or 0 }}" alt="" onerror="this.style.display='none'">
+      </div>
+      <span class="lobby-user-name">{{ user.name or user.username }}</span>
+      {% if user.role == 'admin' %}<span class="lobby-user-role">Admin</span>{% endif %}
     </div>
-    <span class="lobby-user-name">{{ user.name or user.username }}</span>
-    {% if user.role == 'admin' %}<span class="lobby-user-role">Admin</span>{% endif %}
+    <h1>&#9670; NEON CASINO &#9670;</h1>
+    <p>The floor is open</p>
   </div>
-  <h1>&#9670; NEON CASINO &#9670;</h1>
-  <p>Choose your game</p>
-</div>
 
-<div class="lobby-grid">
-  <a href="/game/crash" class="game-card crash">
-    <div class="card-icon">&#128640;</div>
-    <div class="card-name">Aether Crash</div>
-    <div class="card-desc">Ride the multiplier. Cash out before the crash.</div>
-    <span class="card-badge">High Risk</span>
-    <div class="card-play">&#9654; Play Now</div>
+  <!-- 2. Daily bonus (reciprocity) -->
+  <div class="bonus-card" id="bonusCard" style="display:none">
+    <div class="bonus-icon">&#127873;</div>
+    <div class="bonus-text">
+      <div class="bonus-title" id="bonusTitle">Daily bonus ready</div>
+      <div class="bonus-sub" id="bonusSub">Claim <b id="bonusAmt">+$250</b> free chips, on the house.</div>
+      <div class="bonus-streak" id="bonusStreak" style="display:none"></div>
+    </div>
+    <button class="bonus-cta" id="bonusBtn">Claim</button>
+  </div>
+
+  <!-- 3. Featured flagship -->
+  <a href="/game/geniesgold" class="featured">
+    <span class="featured-tag">&#11088; Featured</span>
+    <span class="featured-live"><span class="dot"></span> Live jackpots</span>
+    <div class="featured-body">
+      <div class="featured-emoji">&#129668;</div>
+      <div class="featured-main">
+        <div class="featured-name">Genie's Gold</div>
+        <div class="featured-desc">5 reels · 20 paylines · free spins · four progressive jackpots. The highest ceiling on the floor.</div>
+        <div class="jackpot-teaser">
+          <span class="lbl">Grand jackpot</span>
+          <span class="val" id="featuredJackpot">$5,000</span>
+        </div>
+        <div class="featured-cta">&#9654; Play Genie's Gold</div>
+      </div>
+    </div>
   </a>
 
-  <a href="/game/mines" class="game-card mines">
-    <div class="card-icon">&#9878;&#65039;</div>
-    <div class="card-name">Gem Mines</div>
-    <div class="card-desc">Reveal gems, dodge bombs. One wrong tile ends it.</div>
-    <span class="card-badge">Medium Risk</span>
-    <div class="card-play">&#9654; Play Now</div>
-  </a>
+  <!-- 4. Game grid -->
+  <div class="section-label">More games</div>
+  <div class="lobby-grid">
+    <a href="/game/crash" class="game-card crash">
+      <div class="card-icon">&#128640;</div>
+      <div class="card-name">Aether Crash</div>
+      <div class="card-desc">Ride the multiplier. Cash out before the crash.</div>
+      <span class="card-badge">High Risk</span>
+      <div class="card-play">&#9654; Play</div>
+    </a>
+    <a href="/game/mines" class="game-card mines">
+      <div class="card-icon">&#9878;&#65039;</div>
+      <div class="card-name">Gem Mines</div>
+      <div class="card-desc">Reveal gems, dodge bombs. One wrong tile ends it.</div>
+      <span class="card-badge">Medium Risk</span>
+      <div class="card-play">&#9654; Play</div>
+    </a>
+    <a href="/game/plinko" class="game-card plinko">
+      <div class="card-icon">&#128302;</div>
+      <div class="card-name">Crystal Plinko</div>
+      <div class="card-desc">Drop a crystal through 12 rows. Physics decides.</div>
+      <span class="card-badge">Low Risk</span>
+      <div class="card-play">&#9654; Play</div>
+    </a>
+    <a href="/game/wheel" class="game-card wheel">
+      <div class="card-icon">&#127920;</div>
+      <div class="card-name">Fortune Wheel</div>
+      <div class="card-desc">Spin the wheel. Watch it land. Collect.</div>
+      <span class="card-badge">Medium Risk</span>
+      <div class="card-play">&#9654; Play</div>
+    </a>
+  </div>
 
-  <a href="/game/plinko" class="game-card plinko">
-    <div class="card-icon">&#128302;</div>
-    <div class="card-name">Crystal Plinko</div>
-    <div class="card-desc">Drop a crystal through 12 rows of pegs. Physics decides.</div>
-    <span class="card-badge">Low Risk</span>
-    <div class="card-play">&#9654; Play Now</div>
-  </a>
+  <!-- 5. Leaderboard (real social proof) -->
+  <div class="board">
+    <div class="board-head">
+      <h3>&#127942; Top Players</h3>
+      <span class="board-online"><span class="dot"></span><span id="boardOnline">—</span> online</span>
+    </div>
+    <div id="boardRows"><div class="board-empty">Loading standings…</div></div>
+    <div class="board-foot" id="boardFoot"></div>
+  </div>
 
-  <a href="/game/wheel" class="game-card wheel">
-    <div class="card-icon">&#127920;</div>
-    <div class="card-name">Fortune Wheel</div>
-    <div class="card-desc">Spin the wheel. Watch it land. Collect your prize.</div>
-    <span class="card-badge">Medium Risk</span>
-    <div class="card-play">&#9654; Play Now</div>
-  </a>
-
-  <a href="/game/geniesgold" class="game-card geniesgold">
-    <div class="card-icon">&#129668;</div>
-    <div class="card-name">Genie's Gold</div>
-    <div class="card-desc">5-reel slots. Free spins. Progressive jackpots. The genie grants wishes.</div>
-    <span class="card-badge">High Risk</span>
-    <div class="card-play">&#9654; Play Now</div>
-  </a>
 </div>
 
 <div id="game-over-overlay">
@@ -275,7 +415,6 @@
   <p>Your chips have run out. Start a new session?</p>
   <button class="btn btn-gold btn-lg" onclick="CasinoEngine.API.resetTokens().then(function(r){if(r.ok){CasinoEngine.GameState.setFromData(r);document.getElementById('game-over-overlay').classList.remove('active')}});">Play Again</button>
 </div>
-
 
 <script>
 window.__APP__ = {
@@ -287,7 +426,111 @@ window.__APP__ = {
 };
 (function() {
   'use strict';
-  CasinoEngine.GameState.setFromData(window.__APP__);
+  const GS = CasinoEngine.GameState;
+  GS.setFromData(window.__APP__);
+
+  function money(n) { return '$' + Math.floor(n).toLocaleString(); }
+
+  // ---- Daily bonus (reciprocity, real credit) ----
+  const bonusCard = document.getElementById('bonusCard');
+  const bonusBtn = document.getElementById('bonusBtn');
+  const bonusTitle = document.getElementById('bonusTitle');
+  const bonusSub = document.getElementById('bonusSub');
+  const bonusAmt = document.getElementById('bonusAmt');
+  const bonusStreak = document.getElementById('bonusStreak');
+
+  function renderBonus(b) {
+    bonusCard.style.display = 'flex';
+    if (b.available) {
+      bonusCard.classList.remove('claimed');
+      bonusTitle.textContent = 'Daily bonus ready';
+      bonusSub.innerHTML = 'Claim <b>' + money(b.amount) + '</b> free chips, on the house.';
+      bonusBtn.textContent = 'Claim';
+      bonusBtn.disabled = false;
+    } else {
+      bonusCard.classList.add('claimed');
+      bonusTitle.textContent = 'Bonus claimed today';
+      bonusSub.innerHTML = 'Come back tomorrow for more free chips.';
+      bonusBtn.textContent = 'Claimed';
+      bonusBtn.disabled = true;
+    }
+    if (b.streak && b.streak > 1) {
+      bonusStreak.style.display = 'inline-flex';
+      bonusStreak.innerHTML = '&#128293; ' + b.streak + '-day streak';
+    } else { bonusStreak.style.display = 'none'; }
+  }
+
+  fetch('/api/daily_bonus', {credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(d){ if (d.ok) renderBonus(d.bonus); })
+    .catch(function(){});
+
+  bonusBtn.addEventListener('click', function() {
+    if (bonusBtn.disabled) return;
+    bonusBtn.disabled = true;
+    bonusBtn.textContent = '…';
+    fetch('/api/daily_bonus', {method:'POST', credentials:'same-origin'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if (d.ok) {
+          GS.setBalance(d.tokens);
+          if (window.CasinoEngine.ParticleSystem) new CasinoEngine.ParticleSystem().burst(40, ['#ffd700','#ffe27a','#f5a524']);
+          if (CasinoEngine.sound && CasinoEngine.sound.win) CasinoEngine.sound.win();
+          renderBonus(d.bonus);
+        } else {
+          renderBonus(d.bonus || {available:false});
+        }
+      })
+      .catch(function(){ bonusBtn.disabled = false; bonusBtn.textContent = 'Claim'; });
+  });
+
+  // ---- Featured live jackpot (real pool) ----
+  fetch('/api/geniesgold/jackpots', {credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok && d.pools) document.getElementById('featuredJackpot').textContent = money(d.pools.grand || 5000);
+    }).catch(function(){});
+
+  // ---- Leaderboard (real standings) ----
+  const boardRows = document.getElementById('boardRows');
+  const boardOnline = document.getElementById('boardOnline');
+  const boardFoot = document.getElementById('boardFoot');
+
+  function renderBoard(d) {
+    boardOnline.textContent = d.active_now;
+    if (!d.leaderboard || !d.leaderboard.length) {
+      boardRows.innerHTML = '<div class="board-empty">No players yet — you could be #1.</div>';
+      return;
+    }
+    boardRows.innerHTML = d.leaderboard.map(function(p) {
+      const meCls = p.username === d.me ? ' me' : '';
+      const rCls = p.rank <= 3 ? ' r' + p.rank : '';
+      const pip = p.active ? '<span class="online-pip"></span>' : '';
+      const you = p.username === d.me ? '<span class="you">you</span>' : '';
+      const av = '/api/user/profile_image/user?t=' + (p.avatar_ts || 0);
+      return '<div class="board-row' + meCls + rCls + '">' +
+        '<div class="board-rank">' + p.rank + '</div>' +
+        '<div class="board-av"><img src="' + av + '" alt="" onerror="this.style.display=\'none\'">' + pip + '</div>' +
+        '<div class="board-name">' + escapeHtml(p.name) + you + '</div>' +
+        '<div class="board-tokens">' + money(p.tokens) + '</div>' +
+      '</div>';
+    }).join('');
+    if (d.my_rank && d.my_rank > d.leaderboard.length) {
+      boardFoot.innerHTML = 'You\'re ranked <b>#' + d.my_rank + '</b> of <b>' + d.total_players + '</b> — climb the board.';
+    } else {
+      boardFoot.innerHTML = '<b>' + d.total_players + '</b> players on the floor.';
+    }
+  }
+  function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+
+  function loadBoard() {
+    fetch('/api/leaderboard', {credentials:'same-origin'})
+      .then(function(r){return r.json();})
+      .then(function(d){ if (d.ok) renderBoard(d); })
+      .catch(function(){});
+  }
+  loadBoard();
+  setInterval(loadBoard, 30000);
 })();
 </script>
 </body>
