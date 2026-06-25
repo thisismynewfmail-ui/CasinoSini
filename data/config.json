@@ -1,0 +1,41 @@
+{
+  "server": {
+    "port": 5005,
+    "lan_visible": true
+  },
+  "casino": {
+    "min_bet": 5,
+    "starting_tokens": 1000,
+    "geniesgold": {
+      "jackpot_feed_pct": 0.5,
+      "jackpots": {
+        "grand": {
+          "seed": 5000,
+          "base_odds": 100000,
+          "min_bet": 10
+        },
+        "major": {
+          "seed": 500,
+          "base_odds": 10000,
+          "min_bet": 5
+        },
+        "minor": {
+          "seed": 100,
+          "base_odds": 1000,
+          "min_bet": 5
+        },
+        "mini": {
+          "seed": 25,
+          "base_odds": 200,
+          "min_bet": 5
+        }
+      }
+    }
+  },
+  "ui_defaults": {
+    "bubble_shape": "square",
+    "font_size": 15,
+    "theme": "shifting"
+  },
+  "last_saved": 1782011829
+}

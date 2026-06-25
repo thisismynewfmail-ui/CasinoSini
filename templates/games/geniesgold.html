@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Genie's Gold - Neon Casino</title>
+<script src="{{ url_for('static', filename='js/engine.js') }}"></script>
+<style>
+.geniesgold-bg {
+  position: fixed; inset: 0; z-index: -1;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(168,85,247,0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 30% 80%, rgba(255,215,0,0.06) 0%, transparent 40%),
+    var(--bg-primary);
+}
+.game-title { color: #c084fc; text-shadow: 0 0 20px rgba(168,85,247,0.3); }
+.game-subtitle { color: rgba(192,132,252,0.6); }
+.jackpot-bar {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  max-width: 520px;
+  margin-bottom: 8px;
+}
+.jackpot-item {
+  flex: 1;
+  text-align: center;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1.5px solid;
+  position: relative;
+  overflow: hidden;
+}
+.jackpot-item::before {
+  content: '';
+  position: absolute; inset: 0;
+  opacity: 0.15;
+  border-radius: inherit;
+}
+.jackpot-item.grand { border-color: rgba(255,215,0,0.4); }
+.jackpot-item.grand::before { background: linear-gradient(135deg, #ffd700, #f59e0b); }
+.jackpot-item.major { border-color: rgba(168,85,247,0.4); }
+.jackpot-item.major::before { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+.jackpot-item.minor { border-color: rgba(6,182,212,0.4); }
+.jackpot-item.minor::before { background: linear-gradient(135deg, #06b6d4, #0891b2); }
+.jackpot-item.mini { border-color: rgba(34,197,94,0.4); }
+.jackpot-item.mini::before { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.jackpot-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  position: relative;
+}
+.jackpot-item.grand .jackpot-label { color: #fbbf24; }
+.jackpot-item.major .jackpot-label { color: #c084fc; }
+.jackpot-item.minor .jackpot-label { color: #22d3ee; }
+.jackpot-item.mini .jackpot-label { color: #4ade80; }
+.jackpot-value {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  position: relative;
+}
+.reel-wrap {
+  width: 100%;
+  max-width: 520px;
+  background: linear-gradient(180deg, rgba(168,85,247,0.08), rgba(13,17,23,0.95));
+  border-radius: 12px;
+  border: 2px solid rgba(168,85,247,0.2);
+  overflow: hidden;
+  margin-bottom: 8px;
+  position: relative;
+  box-shadow: 0 0 30px rgba(168,85,247,0.1), inset 0 0 40px rgba(0,0,0,0.3);
+}
+#reelCanvas {
+  width: 100%;
+  display: block;
+}
+.controls-row {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.turbo-btn, .auto-btn, .power-btn {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.turbo-btn.active { border-color: #f59e0b; color: #fbbf24; background: rgba(245,158,11,0.12); }
+.auto-btn.active { border-color: #06b6d4; color: #22d3ee; background: rgba(6,182,212,0.12); }
+.power-btn.active { border-color: #a855f7; color: #c084fc; background: rgba(168,85,247,0.12); }
+.spin-btn-wrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.spin-btn {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  border: 3px solid var(--accent-gold);
+  background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(168,85,247,0.15));
+  color: var(--accent-gold);
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px rgba(255,215,0,0.2);
+}
+.spin-btn:hover { box-shadow: 0 0 30px rgba(255,215,0,0.4); transform: scale(1.05); }
+.spin-btn:active { transform: scale(0.95); }
+.spin-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* Dismissible banners - positioned inside reel-wrap */
+.dismissible-banner {
+  display: none;
+  position: absolute;
+  z-index: 10;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+.dismissible-banner.active { display: block; }
+.dismissible-banner:active { opacity: 0.7; }
+
+.free-spins-banner {
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(168,85,247,0.95), rgba(99,102,241,0.95));
+  padding: 16px 32px;
+  border-radius: 16px;
+  text-align: center;
+  border: 2px solid rgba(255,215,0,0.5);
+  box-shadow: 0 0 40px rgba(168,85,247,0.5);
+  pointer-events: auto;
+}
+.free-spins-banner h3 { color: #fbbf24; font-size: 20px; margin-bottom: 4px; }
+.free-spins-banner p { color: #fff; font-size: 14px; }
+.free-spins-banner .dismiss-hint { color: rgba(255,255,255,0.5); font-size: 10px; margin-top: 6px; }
+
+.genie-blessing {
+  top: 10px; right: 10px;
+  background: rgba(168,85,247,0.9);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+  pointer-events: auto;
+}
+@keyframes genieFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.genie-blessing.active { animation: genieFloat 1s ease infinite; }
+
+.mini-win-display {
+  bottom: 12px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(34,197,94,0.9);
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+@keyframes reelGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(168,85,247,0.1); }
+  50% { box-shadow: 0 0 40px rgba(168,85,247,0.3); }
+}
+.reel-wrap.spinning { animation: reelGlow 0.5s ease infinite; }
+
+.result-line {
+  font-size: 14px;
+  text-align: center;
+  min-height: 24px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.result-line.win { color: var(--accent-gold); font-weight: 700; }
+.result-line.jackpot { color: #fbbf24; font-weight: 800; font-size: 16px; animation: pulseGold 0.6s ease 3; }
+
+/* Auto-spin settings panel */
+.auto-panel {
+  display: none;
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+.auto-panel.active { display: block; }
+.auto-panel h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #22d3ee;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.auto-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.auto-row:last-child { margin-bottom: 0; }
+.auto-row label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+.auto-row input, .auto-row select {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.auto-row input:focus, .auto-row select:focus {
+  border-color: #06b6d4;
+  outline: none;
+}
+.auto-row select {
+  cursor: pointer;
+  -webkit-appearance: auto;
+}
+.auto-start-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.auto-start-row .btn { flex: 1; }
+.auto-counter {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 6px;
+}
+
+@media (max-width: 400px) {
+  .jackpot-value { font-size: 12px; }
+  .spin-btn { width: 56px; height: 56px; font-size: 20px; }
+}
+</style>
+</head>
+<body>
+<div class="geniesgold-bg"></div>
+<a href="/lobby" class="back-btn">&#8592;</a>
+<div class="top-bar">
+  <div class="balance-wrap">
+    <span class="balance-label">Bankroll</span>
+    <span class="balance-value" data-value="{{ tokens }}">${{ tokens }}</span>
+  </div>
+  <div class="stats-wrap">
+    <span class="stat">&nbsp;<span class="stat-streak">{{ stats.streak }}</span></span>
+    <span class="stat">W<span class="stat-wins">{{ stats.wins }}</span></span>
+    <span class="stat">L<span class="stat-losses">{{ stats.losses }}</span></span>
+  </div>
+</div>
+
+<div class="page active">
+  <div class="game-title">&#129668; Genie's Gold</div>
+  <div class="game-subtitle">5 reels. Free spins. Progressive jackpots. The genie grants wishes.</div>
+
+  <div class="jackpot-bar" id="jackpotBar">
+    <div class="jackpot-item grand">
+      <div class="jackpot-label">Grand</div>
+      <div class="jackpot-value" id="jackpotGrand">$5,000</div>
+    </div>
+    <div class="jackpot-item major">
+      <div class="jackpot-label">Major</div>
+      <div class="jackpot-value" id="jackpotMajor">$500</div>
+    </div>
+    <div class="jackpot-item minor">
+      <div class="jackpot-label">Minor</div>
+      <div class="jackpot-value" id="jackpotMinor">$100</div>
+    </div>
+    <div class="jackpot-item mini">
+      <div class="jackpot-label">Mini</div>
+      <div class="jackpot-value" id="jackpotMini">$25</div>
+    </div>
+  </div>
+
+  <div class="reel-wrap" id="reelWrap">
+    <canvas id="reelCanvas"></canvas>
+    <div class="dismissible-banner free-spins-banner" id="freeSpinsBanner">
+      <h3>&#10024; FREE SPINS &#10024;</h3>
+      <p id="freeSpinsInfo">8 Free Spins - All wins 2x!</p>
+      <div class="dismiss-hint">tap to dismiss</div>
+    </div>
+    <div class="dismissible-banner genie-blessing" id="genieBlessing">&#129668; Genie's Blessing!</div>
+    <div class="dismissible-banner mini-win-display" id="miniWinDisplay"></div>
+  </div>
+
+  <div class="bet-area">
+    <div class="bet-row">
+      <div class="bet-input">
+        <span style="color:var(--text-secondary)">$</span>
+        <input type="number" id="betInput" value="10" min="5" step="5">
+      </div>
+      <button class="bet-quick" data-amount="10">10</button>
+      <button class="bet-quick" data-amount="25">25</button>
+      <button class="bet-quick" data-amount="50">50</button>
+      <button class="bet-quick" data-amount="100">100</button>
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <button class="turbo-btn" id="turboBtn">&#9889; Turbo</button>
+    <button class="power-btn" id="powerBtn">&#9889; Power Bet</button>
+    <div class="spin-btn-wrap">
+      <button class="spin-btn" id="spinBtn">&#9654;</button>
+    </div>
+    <button class="auto-btn" id="autoBtn">&#8634; Auto</button>
+  </div>
+
+  <!-- Auto-spin settings panel -->
+  <div class="auto-panel" id="autoPanel">
+    <h4>&#8634; Auto-Spin Settings</h4>
+    <div class="auto-row">
+      <label>Number of Spins</label>
+      <select id="autoCount">
+        <option value="10">10</option>
+        <option value="25" selected>25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="999">Until Stopped</option>
+      </select>
+    </div>
+    <div class="auto-row">
+      <label>Stop on Win &ge;</label>
+      <input type="number" id="autoStopWin" value="0" min="0" step="10" placeholder="0 = off">
+    </div>
+    <div class="auto-row">
+      <label>Stop on Balance &le;</label>
+      <input type="number" id="autoStopBalance" value="0" min="0" step="10" placeholder="0 = off">
+    </div>
+    <div class="auto-row">
+      <label>Stop on Loss &ge;</label>
+      <input type="number" id="autoStopLoss" value="0" min="0" step="10" placeholder="0 = off">
+    </div>
+    <div class="auto-start-row">
+      <button class="btn btn-green btn-lg" id="autoStartBtn">&#8634; Start Auto-Spin</button>
+      <button class="btn btn-outline btn-lg" id="autoStopBtn" style="display:none">&#9632; Stop</button>
+    </div>
+    <div class="auto-counter" id="autoCounter"></div>
+  </div>
+
+  <div class="result-line" id="resultLine"></div>
+</div>
+
+<div id="game-over-overlay">
+  <h2>BANKRUPT</h2>
+  <p>Your chips have run out. Start a new session?</p>
+  <button class="btn btn-gold btn-lg" onclick="(function(){CasinoEngine.API.resetTokens().then(function(r){if(r.ok){CasinoEngine.GameState.setFromData(r);document.getElementById('game-over-overlay').classList.remove('active')}})})()">Play Again</button>
+</div>
+
+<script>
+window.__APP__ = {
+  user: {{ user | tojson }},
+  tokens: {{ tokens }},
+  stats: {{ stats | tojson }},
+  game: "geniesgold",
+  min_bet: {{ min_bet }}
+};
+(function() {
+  'use strict';
+  const GS = CasinoEngine.GameState;
+  const API = CasinoEngine.API;
+  const sound = CasinoEngine.sound;
+  GS.currentGame = 'geniesgold';
+
+  // ===================== SYMBOLS =====================
+  const SYMBOLS = [
+    { id: 'club',    label: '\u2663', color: '#60a5fa', pay: [0, 0, 0.3, 0.5, 1] },
+    { id: 'diamond', label: '\u2666', color: '#f472b6', pay: [0, 0, 0.3, 0.5, 1] },
+    { id: 'heart',   label: '\u2665', color: '#f87171', pay: [0, 0, 0.4, 0.6, 1.2] },
+    { id: 'spade',   label: '\u2660', color: '#a78bfa', pay: [0, 0, 0.4, 0.6, 1.2] },
+    { id: 'scorpion',label: '\u{1F982}', color: '#fb923c', pay: [0, 0, 0.5, 1, 2] },
+    { id: 'sword',   label: '\u2694', color: '#94a3b8', pay: [0, 0, 0.8, 1.5, 3] },
+    { id: 'idol',    label: '\u{1F451}', color: '#fbbf24', pay: [0, 0, 1, 2, 5] },
+    { id: 'chest',   label: '\u{1F4E6}', color: '#f59e0b', pay: [0, 0, 1.5, 3, 8] },
+    { id: 'lamp',    label: '\u{1F56F}', color: '#c084fc', pay: [0, 0, 2, 5, 15] },
+    { id: 'wild',    label: '\u{1F9DE}', color: '#a855f7', pay: [0, 0, 2, 5, 15], isWild: true },
+    { id: 'scatter', label: '\u2B50', color: '#fbbf24', pay: [0, 0, 2, 5, 10], isScatter: true },
+  ];
+
+  const WILD_IDX = 9;
+  const SCATTER_IDX = 10;
+
+  const REEL_WEIGHTS = [
+    [0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,8,9,10],
+    [0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,8,9,10,10],
+    [0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,8,9,9,10],
+    [0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,8,9,10,10],
+    [0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,8,9,10],
+  ];
+
+  const PAYLINES = [
+    [1,1,1,1,1], [0,0,0,0,0], [2,2,2,2,2],
+    [0,1,2,1,0], [2,1,0,1,2],
+    [0,0,1,2,2], [2,2,1,0,0],
+    [1,0,0,0,1], [1,2,2,2,1],
+    [1,0,1,0,1], [1,2,1,2,1],
+    [0,1,0,1,0], [2,1,2,1,2],
+    [0,1,1,1,0], [2,1,1,1,2],
+    [1,1,0,1,1], [1,1,2,1,1],
+    [0,0,1,0,0], [2,2,1,2,2],
+    [0,2,0,2,0],
+  ];
+  const PAYLINE_COLORS = [
+    '#ef4444','#22c55e','#60a5fa','#fbbf24','#c084fc',
+    '#f472b6','#06b6d4','#fb923c','#a78bfa','#34d399',
+    '#f87171','#818cf8','#facc15','#2dd4bf','#e879f9',
+    '#38bdf8','#fb7185','#4ade80','#f97316','#a3e635',
+  ];
+
+  // ===================== CANVAS =====================
+  const canvas = document.getElementById('reelCanvas');
+  const ctx = canvas.getContext('2d');
+  const reelWrap = document.getElementById('reelWrap');
+  const spinBtn = document.getElementById('spinBtn');
+  const betInput = document.getElementById('betInput');
+  const resultLine = document.getElementById('resultLine');
+  const turboBtn = document.getElementById('turboBtn');
+  const autoBtn = document.getElementById('autoBtn');
+  const powerBtn = document.getElementById('powerBtn');
+  const freeSpinsBanner = document.getElementById('freeSpinsBanner');
+  const freeSpinsInfo = document.getElementById('freeSpinsInfo');
+  const genieBlessing = document.getElementById('genieBlessing');
+  const miniWinDisplay = document.getElementById('miniWinDisplay');
+  const autoPanel = document.getElementById('autoPanel');
+  const autoStartBtn = document.getElementById('autoStartBtn');
+  const autoStopBtn = document.getElementById('autoStopBtn');
+  const autoCounter = document.getElementById('autoCounter');
+
+  const COLS = 5;
+  const ROWS = 3;
+  let cellW, cellH;
+  let reelSymbols = [];
+  let spinning = false;
+  let spinPhase = [];
+  let betAmount = 0;
+  let currentBetId = null;
+  let turboMode = false;
+  let powerBet = false;
+  let freeSpinsLeft = 0;
+  let freeSpinsTotal = 0;
+  let freeSpinWinnings = 0;
+  let jackpotPools = {grand:5000,major:500,minor:100,mini:25};
+
+  // Auto-spin state
+  let autoRunning = false;
+  let autoSpinsLeft = 0;
+  let autoTotalSpins = 0;
+  let autoSpinsDone = 0;
+  let autoStopWin = 0;
+  let autoStopBalance = 0;
+  let autoStopLoss = 0;
+  let autoConsecutiveLosses = 0;
+  let autoSessionWins = 0;
+  let autoSessionLosses = 0;
+
+  // Dismiss timers for banners
+  let bannerTimers = {};
+
+  function resize() {
+    const rect = reelWrap.getBoundingClientRect();
+    const w = rect.width;
+    cellW = Math.floor((w - 20) / COLS);
+    cellH = Math.floor(cellW * 0.75);
+    canvas.width = w * 2;
+    canvas.height = (cellH * ROWS + 10) * 2;
+    canvas.style.width = w + 'px';
+    canvas.style.height = (cellH * ROWS + 10) + 'px';
+    ctx.scale(2, 2);
+    drawReels();
+  }
+
+  // ===================== BANNER MANAGEMENT =====================
+  function showBanner(el, msg, duration) {
+    if (bannerTimers[el.id]) clearTimeout(bannerTimers[el.id]);
+    if (msg) el.textContent = msg;
+    el.classList.add('active');
+    bannerTimers[el.id] = setTimeout(function() {
+      dismissBanner(el);
+    }, duration || 4000);
+  }
+
+  function dismissBanner(el) {
+    if (bannerTimers[el.id]) {
+      clearTimeout(bannerTimers[el.id]);
+      delete bannerTimers[el.id];
+    }
+    el.classList.remove('active');
+  }
+
+  // Make all banners clickable to dismiss
+  [freeSpinsBanner, genieBlessing, miniWinDisplay].forEach(function(el) {
+    el.addEventListener('click', function() {
+      dismissBanner(el);
+    });
+  });
+
+  // ===================== REEL GENERATION =====================
+  function spinReels() {
+    reelSymbols = [];
+    for (let c = 0; c < COLS; c++) {
+      const col = [];
+      const strip = REEL_WEIGHTS[c];
+      for (let r = 0; r < ROWS; r++) {
+        col.push(strip[Math.floor(Math.random() * strip.length)]);
+      }
+      reelSymbols.push(col);
+    }
+  }
+
+  function forceNearMiss() {
+    if (Math.random() < 0.35) {
+      const sym = Math.floor(Math.random() * 8);
+      reelSymbols[0][1] = sym;
+      reelSymbols[1][1] = sym;
+    }
+  }
+
+  function forceMiniWin() {
+    if (Math.random() < 0.4) {
+      const sym = Math.floor(Math.random() * 6);
+      reelSymbols[0][1] = sym;
+      reelSymbols[1][1] = sym;
+      reelSymbols[2][1] = sym;
+    }
+  }
+
+  function applyGeniesBlessing() {
+    if (Math.random() < 0.10) {
+      const wCount = 1 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < wCount; i++) {
+        const col = 1 + Math.floor(Math.random() * 3);
+        const row = Math.floor(Math.random() * ROWS);
+        reelSymbols[col][row] = WILD_IDX;
+      }
+      showBanner(genieBlessing, '\u{1F9DE} Genie\'s Blessing!', 4000);
+      return true;
+    }
+    return false;
+  }
+
+  function checkJackpotHit() {
+    const cfg = window.__jackpotConfig || {};
+    const jp = cfg.jackpots || {};
+    const tiers = ['grand','major','minor','mini'];
+    for (let i = tiers.length - 1; i >= 0; i--) {
+      const t = tiers[i];
+      const tcfg = jp[t] || {};
+      const baseOdds = tcfg.base_odds || [200,1000,10000,100000][i];
+      const minBet = tcfg.min_bet || 5;
+      const effectiveBet = powerBet ? betAmount * 1.5 : betAmount;
+      if (effectiveBet < minBet) continue;
+      const odds = powerBet ? Math.floor(baseOdds * 0.7) : baseOdds;
+      if (Math.random() * odds < 1) return t;
+    }
+    return null;
+  }
+
+  // ===================== DRAWING =====================
+  function drawReels() {
+    const w = canvas.width / 2;
+    const h = canvas.height / 2;
+    ctx.clearRect(0, 0, w, h);
+
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        const x = 10 + c * cellW;
+        const y = 5 + r * cellH;
+        ctx.fillStyle = (c + r) % 2 === 0 ? 'rgba(168,85,247,0.06)' : 'rgba(168,85,247,0.03)';
+        ctx.fillRect(x, y, cellW - 2, cellH - 2);
+        ctx.strokeStyle = 'rgba(168,85,247,0.12)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, cellW - 2, cellH - 2);
+      }
+    }
+
+    for (let c = 0; c < COLS; c++) {
+      const sp = spinPhase[c];
+      for (let r = 0; r < ROWS; r++) {
+        let symIdx = reelSymbols[c] ? reelSymbols[c][r] : 0;
+        let sym = SYMBOLS[symIdx];
+        let x = 10 + c * cellW;
+        let yOff = sp ? sp.offset : 0;
+        let y = 5 + r * cellH + yOff;
+
+        if (sp && sp.speed > 0) {
+          const blur = Math.min(8, Math.abs(sp.speed) * 0.8);
+          ctx.globalAlpha = Math.max(0.3, 1 - blur * 0.08);
+        }
+
+        if (sym.isWild || sym.isScatter) {
+          ctx.shadowColor = sym.color;
+          ctx.shadowBlur = 12;
+        }
+
+        ctx.fillStyle = sym.color;
+        ctx.font = 'bold ' + Math.floor(cellH * 0.5) + 'px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(sym.label, x + cellW / 2 - 1, y + cellH / 2);
+
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function drawWinLine(lineIdx) {
+    const line = PAYLINES[lineIdx];
+    const color = PAYLINE_COLORS[lineIdx];
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    for (let c = 0; c < COLS; c++) {
+      const row = line[c];
+      const x = 10 + c * cellW + cellW / 2 - 1;
+      const y = 5 + row * cellH + cellH / 2;
+      if (c === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function drawWinHighlights(winLines) {
+    drawReels();
+    winLines.forEach(function(wl) { drawWinLine(wl.line); });
+  }
+
+  // ===================== PAYLINE EVALUATION =====================
+  function evaluatePaylines() {
+    const wins = [];
+    for (let p = 0; p < PAYLINES.length; p++) {
+      const line = PAYLINES[p];
+      const symbolsOnLine = line.map(function(r, c) { return reelSymbols[c][r]; });
+      const result = evaluateLine(symbolsOnLine);
+      if (result) {
+        wins.push({ line: p, symbol: result.symbol, count: result.count, pay: result.pay });
+      }
+    }
+    let scatterCount = 0;
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        if (reelSymbols[c][r] === SCATTER_IDX) scatterCount++;
+      }
+    }
+    if (scatterCount >= 3) {
+      const scatterPay = SYMBOLS[SCATTER_IDX].pay[Math.min(scatterCount, 4)];
+      wins.push({ line: -1, symbol: SCATTER_IDX, count: scatterCount, pay: scatterPay, isScatter: true });
+    }
+    return wins;
+  }
+
+  function evaluateLine(symbols) {
+    const first = symbols[0];
+    const sym = SYMBOLS[first];
+    if (sym.isScatter) return null;
+
+    let count = 1;
+    let matchSym = first;
+
+    for (let i = 1; i < symbols.length; i++) {
+      const s = symbols[i];
+      if (s === matchSym) {
+        count++;
+      } else if (SYMBOLS[s].isWild) {
+        count++;
+      } else if (SYMBOLS[matchSym].isWild) {
+        matchSym = s;
+        count++;
+      } else {
+        break;
+      }
+    }
+
+    if (count >= 3) {
+      const pay = SYMBOLS[matchSym].pay[Math.min(count, 4)];
+      if (pay > 0) return { symbol: matchSym, count: count, pay: pay };
+    }
+    return null;
+  }
+
+  // ===================== SPINNING ANIMATION =====================
+  function startSpin() {
+    spinPhase = [];
+    for (let c = 0; c < COLS; c++) {
+      spinPhase.push({
+        offset: 0,
+        speed: 20 + Math.random() * 10,
+        stopping: false,
+        stopped: false,
+        stopDelay: turboMode ? 100 + c * 80 : 300 + c * 250,
+      });
+    }
+    reelWrap.classList.add('spinning');
+  }
+
+  function updateSpin() {
+    let allStopped = true;
+    const now = performance.now();
+    for (let c = 0; c < COLS; c++) {
+      const sp = spinPhase[c];
+      if (sp.stopped) continue;
+      allStopped = false;
+
+      if (!sp.stopping) {
+        sp.offset += sp.speed;
+        if (sp.offset > cellH * 2) sp.offset -= cellH * 2;
+        if (!sp.startTime) sp.startTime = now;
+        if (now - sp.startTime > sp.stopDelay) {
+          sp.stopping = true;
+          sp.speed = 15;
+        }
+      } else {
+        sp.speed *= 0.85;
+        sp.offset += sp.speed;
+        if (sp.speed < 0.5) {
+          sp.stopped = true;
+          sp.offset = 0;
+          sound.tick();
+        }
+      }
+    }
+
+    drawReels();
+
+    if (!allStopped) {
+      requestAnimationFrame(updateSpin);
+    } else {
+      onReelsStopped();
+    }
+  }
+
+  // ===================== AUTO-SPIN ENGINE =====================
+  function updateAutoCounter() {
+    if (!autoRunning) {
+      autoCounter.textContent = '';
+      return;
+    }
+    const remaining = autoSpinsLeft >= 999999 ? 'unlimited' : autoSpinsLeft;
+    autoCounter.textContent = 'Auto: ' + autoSpinsDone + ' / ' + (autoTotalSpins >= 999999 ? 'unlimited' : autoTotalSpins) +
+      ' completed | W:' + autoSessionWins + ' L:' + autoSessionLosses;
+  }
+
+  function shouldStopAuto(winAmount) {
+    if (!autoRunning) return true;
+    if (autoSpinsLeft <= 0) return true;
+    if (autoStopWin > 0 && winAmount >= autoStopWin) return true;
+    if (autoStopBalance > 0 && GS.balance <= autoStopBalance) return true;
+    if (autoStopLoss > 0 && autoConsecutiveLosses >= autoStopLoss) return true;
+    return false;
+  }
+
+  function startAutoSpin() {
+    autoRunning = true;
+    autoSpinsLeft = parseInt(document.getElementById('autoCount').value) || 25;
+    autoTotalSpins = autoSpinsLeft;
+    autoStopWin = parseInt(document.getElementById('autoStopWin').value) || 0;
+    autoStopBalance = parseInt(document.getElementById('autoStopBalance').value) || 0;
+    autoStopLoss = parseInt(document.getElementById('autoStopLoss').value) || 0;
+    autoSpinsDone = 0;
+    autoConsecutiveLosses = 0;
+    autoSessionWins = 0;
+    autoSessionLosses = 0;
+    autoBtn.classList.add('active');
+    autoBtn.textContent = '\u23F9 Stop';
+    autoStartBtn.style.display = 'none';
+    autoStopBtn.style.display = 'flex';
+    autoPanel.classList.remove('active');
+    updateAutoCounter();
+    if (!spinning) doSpin();
+  }
+
+  function stopAutoSpin() {
+    autoRunning = false;
+    autoSpinsLeft = 0;
+    autoBtn.classList.remove('active');
+    autoBtn.textContent = '\u21BB Auto';
+    autoStartBtn.style.display = 'flex';
+    autoStopBtn.style.display = 'none';
+    autoCounter.textContent = '';
+  }
+
+  function onAutoSpinResult(winAmount, isMiniWin) {
+    autoSpinsDone++;
+    autoSpinsLeft--;
+    if (winAmount > 0 && !isMiniWin) {
+      autoSessionWins++;
+      autoConsecutiveLosses = 0;
+    } else {
+      autoSessionLosses++;
+      autoConsecutiveLosses++;
+    }
+    updateAutoCounter();
+
+    if (shouldStopAuto(winAmount)) {
+      stopAutoSpin();
+      return false;
+    }
+    return true;
+  }
+
+  // ===================== RESULT PROCESSING =====================
+  function onReelsStopped() {
+    reelWrap.classList.remove('spinning');
+    const wins = evaluatePaylines();
+    let totalWin = 0;
+    wins.forEach(function(w) {
+      if (!w.isScatter) totalWin += Math.floor(betAmount / 20 * w.pay * 20);
+    });
+
+    let isMiniWin = false;
+    if (totalWin === 0) {
+      if (Math.random() < 0.40) {
+        totalWin = Math.floor(betAmount * (0.5 + Math.random() * 0.45));
+        isMiniWin = true;
+        wins.length = 0;
+      }
+    }
+
+    if (freeSpinsLeft > 0 && totalWin > 0) {
+      totalWin = Math.floor(totalWin * 2);
+    }
+
+    if (totalWin > 0 && !isMiniWin) {
+      drawWinHighlights(wins.filter(function(w) { return !w.isScatter; }));
+      if (totalWin >= betAmount * 5) {
+        sound.jackpot();
+        const pt = new CasinoEngine.ParticleSystem();
+        pt.burst(60, ['#ffd700','#c084fc','#a855f7','#fbbf24']);
+      } else if (totalWin >= betAmount * 2) {
+        sound.bigWin();
+        const pt = new CasinoEngine.ParticleSystem();
+        pt.burst(30, ['#c084fc','#ffd700']);
+      } else {
+        sound.win();
+      }
+      resultLine.textContent = 'WIN $' + totalWin + '!';
+      resultLine.className = 'result-line win';
+    } else if (isMiniWin) {
+      sound.win();
+      showBanner(miniWinDisplay, 'Mini Win! $' + totalWin, 3000);
+      resultLine.textContent = 'Mini Win! $' + totalWin;
+      resultLine.className = 'result-line win';
+    } else {
+      sound.lose();
+      resultLine.textContent = 'No win. Try again!';
+      resultLine.className = 'result-line';
+    }
+
+    // Scatter free spins (trigger or retrigger)
+    let freeSpinTriggeredThisSpin = false;
+    const scatterHits = wins.filter(function(w) { return w.isScatter; });
+    if (scatterHits.length > 0) {
+      const sc = scatterHits[0].count;
+      const freeCount = sc === 3 ? 8 : sc === 4 ? 12 : 20;
+      if (freeSpinsLeft <= 0) {
+        freeSpinTriggeredThisSpin = true;
+        startFreeSpins(freeCount);
+      } else {
+        freeSpinsLeft += freeCount;
+        freeSpinsInfo.textContent = freeSpinsLeft + ' Free Spins! +' + freeCount + ' retriggers!';
+        showBanner(freeSpinsBanner, null, 3000);
+        sound.jackpot();
+        const pt2 = new CasinoEngine.ParticleSystem();
+        pt2.burst(30, ['#a855f7','#c084fc','#ffd700']);
+      }
+    }
+
+    // Jackpot
+    const jackpotTier = checkJackpotHit();
+    if (jackpotTier) {
+      handleJackpotWin(jackpotTier);
+    }
+
+    // Auto-spin: track results and maybe continue (only on paid spins, not free spins)
+    const autoContinue = (autoRunning && freeSpinsLeft <= 0 && !freeSpinTriggeredThisSpin) ? onAutoSpinResult(totalWin, isMiniWin) : autoRunning;
+
+    // Free spins continue automatically
+    if (freeSpinsLeft > 0) {
+      finishFreeSpin(totalWin);
+      return;
+    }
+
+    // Record result and schedule next
+    if (totalWin > 0) {
+      API.recordWin(currentBetId, totalWin).then(function(r) {
+        if (r.ok) { GS.balance = r.tokens; GS.setStats(r.stats); GS.updateUI(); }
+        scheduleNext(autoContinue);
+      });
+    } else {
+      API.recordLoss(currentBetId).then(function(r) {
+        if (r.ok) { GS.balance = r.tokens; GS.setStats(r.stats); GS.updateUI(); }
+        scheduleNext(autoContinue);
+      });
+    }
+    GS.checkGameOver();
+  }
+
+  function scheduleNext(autoContinue) {
+    if (freeSpinsLeft > 0) return;
+    if (autoContinue) {
+      setTimeout(function() { doSpin(); }, turboMode ? 200 : 500);
+    } else {
+      setTimeout(function() {
+        spinning = false;
+        spinBtn.disabled = false;
+      }, 100);
+    }
+  }
+
+  function finishFreeSpin(winAmount) {
+    freeSpinWinnings += winAmount;
+    freeSpinsLeft--;
+    if (freeSpinsLeft > 0) {
+      freeSpinsInfo.textContent = freeSpinsLeft + ' Free Spins Remaining';
+      setTimeout(function() { doSpin(); }, turboMode ? 300 : 800);
+    } else {
+      dismissBanner(freeSpinsBanner);
+      resultLine.textContent = 'Free Spins ended! Won $' + freeSpinWinnings + ' total!';
+      resultLine.className = 'result-line jackpot';
+      API.recordWin(currentBetId, freeSpinWinnings).then(function(r) {
+        if (r.ok) { GS.balance = r.tokens; GS.setStats(r.stats); GS.updateUI(); }
+      });
+      const pt = new CasinoEngine.ParticleSystem();
+      pt.burst(50, ['#ffd700','#c084fc','#22c55e']);
+      freeSpinWinnings = 0;
+      spinning = false;
+      spinBtn.disabled = false;
+      if (autoRunning) {
+        if (shouldStopAuto(0)) {
+          stopAutoSpin();
+        } else {
+          setTimeout(function() { doSpin(); }, turboMode ? 200 : 500);
+        }
+      }
+    }
+  }
+
+  // ===================== FREE SPINS =====================
+  function startFreeSpins(count) {
+    freeSpinsLeft = count;
+    freeSpinsTotal = count;
+    freeSpinsInfo.textContent = count + ' Free Spins - All wins 2x! (tap to dismiss)';
+    showBanner(freeSpinsBanner, null, 5000);
+    sound.jackpot();
+    const pt = new CasinoEngine.ParticleSystem();
+    pt.burst(40, ['#a855f7','#c084fc','#ffd700']);
+    resultLine.textContent = 'FREE SPINS TRIGGERED! ' + count + ' spins!';
+    resultLine.className = 'result-line jackpot';
+  }
+
+  // ===================== JACKPOT =====================
+  function handleJackpotWin(tier) {
+    const amount = jackpotPools[tier] || 0;
+    resultLine.textContent = 'JACKPOT! ' + tier.toUpperCase() + ' - $' + amount + '!';
+    resultLine.className = 'result-line jackpot';
+    sound.jackpot();
+    const pt = new CasinoEngine.ParticleSystem();
+    pt.burst(100, ['#ffd700','#fbbf24','#c084fc','#a855f7','#22c55e']);
+    reelWrap.classList.add('shake');
+    setTimeout(function() { reelWrap.classList.remove('shake'); }, 1000);
+
+    API.placeBet('geniesgold', 0).then(function(r) {
+      if (r.ok) {
+        fetch('/api/geniesgold/jackpot_win', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          credentials: 'same-origin',
+          body: JSON.stringify({ tier: tier, bet_id: r.bet_id })
+        }).then(function(res) { return res.json(); }).then(function(data) {
+          if (data.ok) {
+            GS.balance = data.tokens;
+            GS.setStats(data.stats);
+            GS.updateUI();
+            fetchJackpots();
+          }
+        });
+      }
+    });
+  }
+
+  function fetchJackpots() {
+    fetch('/api/geniesgold/jackpots', { credentials: 'same-origin' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          jackpotPools = data.pools || jackpotPools;
+          window.__jackpotConfig = data.config || {};
+          document.getElementById('jackpotGrand').textContent = '$' + Math.floor(jackpotPools.grand).toLocaleString();
+          document.getElementById('jackpotMajor').textContent = '$' + Math.floor(jackpotPools.major).toLocaleString();
+          document.getElementById('jackpotMinor').textContent = '$' + Math.floor(jackpotPools.minor).toLocaleString();
+          document.getElementById('jackpotMini').textContent = '$' + Math.floor(jackpotPools.mini).toLocaleString();
+        }
+      });
+  }
+
+  // ===================== MAIN SPIN =====================
+  async function doSpin() {
+    if (spinning) return;
+    const amt = freeSpinsLeft > 0 ? 0 : (parseInt(betInput.value) || CasinoEngine.MIN_BET);
+    if (freeSpinsLeft <= 0 && amt > GS.balance) {
+      resultLine.textContent = 'Not enough chips!';
+      GS.checkGameOver();
+      stopAutoSpin();
+      return;
+    }
+
+    if (freeSpinsLeft <= 0) {
+      const result = await API.placeBet('geniesgold', amt);
+      if (!result.ok) {
+        resultLine.textContent = result.error || 'Bet failed';
+        stopAutoSpin();
+        return;
+      }
+      GS.balance = result.tokens;
+      currentBetId = result.bet_id;
+      betAmount = amt;
+
+      const feedPct = (window.__jackpotConfig && window.__jackpotConfig.jackpot_feed_pct) || 1.5;
+      const feed = amt * feedPct / 100;
+      jackpotPools.grand += feed * 0.5;
+      jackpotPools.major += feed * 0.25;
+      jackpotPools.minor += feed * 0.15;
+      jackpotPools.mini += feed * 0.10;
+    } else {
+      currentBetId = 'freespin_' + Date.now();
+      betAmount = parseInt(betInput.value) || CasinoEngine.MIN_BET;
+    }
+
+    spinning = true;
+    spinBtn.disabled = true;
+    resultLine.textContent = freeSpinsLeft > 0 ? 'Free Spin...' : 'Spinning...';
+    resultLine.className = 'result-line';
+
+    spinReels();
+
+    if (freeSpinsLeft <= 0) {
+      const realWins = evaluatePaylines().filter(function(w) { return !w.isScatter; });
+      const hasRealWin = realWins.some(function(w) {
+        return SYMBOLS[w.symbol].pay[Math.min(w.count,4)] * (betAmount/20) >= betAmount;
+      });
+
+      if (!hasRealWin) {
+        forceNearMiss();
+        forceMiniWin();
+      }
+      applyGeniesBlessing();
+    }
+
+    if (turboMode) {
+      drawReels();
+      setTimeout(function() { onReelsStopped(); }, 150);
+    } else {
+      startSpin();
+      requestAnimationFrame(updateSpin);
+    }
+    GS.updateUI();
+  }
+
+  // ===================== CONTROLS =====================
+  spinBtn.addEventListener('click', function() {
+    if (spinning) return;
+    if (GS.balance < CasinoEngine.MIN_BET && freeSpinsLeft <= 0) {
+      resultLine.textContent = 'Not enough chips!';
+      GS.checkGameOver();
+      return;
+    }
+    doSpin();
+  });
+
+  turboBtn.addEventListener('click', function() {
+    turboMode = !turboMode;
+    this.classList.toggle('active', turboMode);
+    sound.click();
+  });
+
+  // Auto button: single click toggles panel, long-press or double-click starts
+  let autoBtnClickCount = 0;
+  let autoBtnTimer = null;
+  autoBtn.addEventListener('click', function() {
+    autoBtnClickCount++;
+    if (autoBtnClickCount === 1) {
+      autoBtnTimer = setTimeout(function() {
+        autoBtnClickCount = 0;
+        // Single click: toggle panel
+        if (autoRunning) {
+          stopAutoSpin();
+        } else {
+          autoPanel.classList.toggle('active');
+        }
+      }, 250);
+    } else if (autoBtnClickCount === 2) {
+      clearTimeout(autoBtnTimer);
+      autoBtnClickCount = 0;
+      // Double click: quick start/stop
+      if (autoRunning) {
+        stopAutoSpin();
+      } else {
+        startAutoSpin();
+      }
+    }
+    sound.click();
+  });
+
+  autoStartBtn.addEventListener('click', function() { startAutoSpin(); });
+  autoStopBtn.addEventListener('click', function() { stopAutoSpin(); });
+
+  powerBtn.addEventListener('click', function() {
+    powerBet = !powerBet;
+    this.classList.toggle('active', powerBet);
+    sound.click();
+    if (powerBet) {
+      const base = parseInt(betInput.value) || 10;
+      betInput.value = Math.floor(base * 1.5);
+    } else {
+      betInput.value = Math.floor((parseInt(betInput.value) || 15) / 1.5);
+    }
+  });
+
+  document.querySelectorAll('.bet-quick').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const val = parseInt(this.dataset.amount);
+      betInput.value = powerBet ? Math.floor(val * 1.5) : val;
+      document.querySelectorAll('.bet-quick').forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      sound.click();
+    });
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (!spinning) {
+        if (GS.balance < CasinoEngine.MIN_BET && freeSpinsLeft <= 0) {
+          resultLine.textContent = 'Not enough chips!';
+          GS.checkGameOver();
+          return;
+        }
+        doSpin();
+      } else if (autoRunning) {
+        stopAutoSpin();
+      }
+    }
+  });
+
+  // ===================== INIT =====================
+  resize();
+  window.addEventListener('resize', resize);
+  fetchJackpots();
+  setInterval(fetchJackpots, 30000);
+  GS.setFromData(window.__APP__);
+})();
+</script>
+</body>
+</html>

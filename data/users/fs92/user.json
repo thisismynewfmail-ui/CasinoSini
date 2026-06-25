@@ -1,0 +1,25 @@
+{
+  "username": "fs92",
+  "name": "fs92",
+  "email": "fs92@gmail.com",
+  "password": "1928",
+  "zip_code": "95472",
+  "role": "base",
+  "ui": {
+    "theme": "shifting",
+    "font_size": 15,
+    "bubble_shape": "square"
+  },
+  "tokens": 995,
+  "stats": {
+    "wins": 4,
+    "losses": 1,
+    "streak": 1,
+    "total_wagered": 50,
+    "total_won": 45,
+    "games_played": 5
+  },
+  "avatar_ts": 0,
+  "created": 1782006029,
+  "last_login": 1782006029
+}

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Crystal Plinko - Neon Casino</title>
+<script src="{{ url_for('static', filename='js/engine.js') }}"></script>
+<style>
+.plinko-bg {
+  position: fixed; inset: 0; z-index: -1;
+  background: radial-gradient(ellipse at 50% 30%, rgba(236,72,153,0.08) 0%, transparent 60%), var(--bg-primary);
+}
+.game-title { color: #f472b6; }
+.game-subtitle { color: rgba(236,72,153,0.6); }
+.plinko-canvas-wrap {
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 9/16;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 12px;
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+#plinkoCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.plinko-controls {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.multiplier-bar {
+  display: flex;
+  width: 100%;
+  max-width: 380px;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.multiplier-bar .slot {
+  flex: 1;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 4px 0;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+.multiplier-bar .slot.high { background: rgba(236,72,153,0.2); color: #f472b6; }
+.multiplier-bar .slot.med { background: rgba(251,191,36,0.2); color: #fbbf24; }
+.multiplier-bar .slot.low { background: rgba(34,197,94,0.2); color: #22c55e; }
+.multiplier-bar .slot.zero { background: rgba(239,68,68,0.15); color: #ef4444; }
+.multiplier-bar .slot.hit { transform: scale(1.3); box-shadow: 0 0 12px currentColor; z-index: 2; }
+.result-line {
+  font-size: 14px;
+  text-align: center;
+  min-height: 24px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+</style>
+</head>
+<body>
+<div class="plinko-bg"></div>
+<a href="/lobby" class="back-btn">&#8592;</a>
+<div class="top-bar">
+  <div class="balance-wrap">
+    <span class="balance-label">Bankroll</span>
+    <span class="balance-value" data-value="{{ tokens }}">${{ tokens }}</span>
+  </div>
+  <div class="stats-wrap">
+    <span class="stat">&nbsp;<span class="stat-streak">{{ stats.streak }}</span></span>
+    <span class="stat">W<span class="stat-wins">{{ stats.wins }}</span></span>
+    <span class="stat">L<span class="stat-losses">{{ stats.losses }}</span></span>
+  </div>
+</div>
+
+<div class="page active">
+  <div class="game-title">&#128302; Crystal Plinko</div>
+  <div class="game-subtitle">Drop a crystal through 12 rows. Physics decides your fate.</div>
+
+  <div class="multiplier-bar" id="multiplierBar"></div>
+
+  <div class="plinko-canvas-wrap">
+    <canvas id="plinkoCanvas"></canvas>
+  </div>
+
+  <div class="plinko-controls">
+    <div class="bet-area">
+      <div class="bet-row">
+        <div class="bet-input">
+          <span style="color:var(--text-secondary)">$</span>
+          <input type="number" id="betInput" value="10" min="5" step="5">
+        </div>
+        <button class="bet-quick" data-amount="10">10</button>
+        <button class="bet-quick" data-amount="25">25</button>
+        <button class="bet-quick" data-amount="50">50</button>
+        <button class="bet-quick" data-amount="100">100</button>
+      </div>
+    </div>
+    <button class="btn btn-pink btn-lg" id="dropBtn" style="background:linear-gradient(135deg,#ec4899,#db2777);color:#fff;box-shadow:0 4px 14px rgba(236,72,153,0.35)">&#128302; Drop Crystal</button>
+  </div>
+  <div class="result-line" id="resultLine"></div>
+</div>
+
+<div id="game-over-overlay">
+  <h2>BANKRUPT</h2>
+  <p>Your chips have run out. Start a new session?</p>
+  <button class="btn btn-gold btn-lg" onclick="(function(){CasinoEngine.API.resetTokens().then(function(r){if(r.ok){CasinoEngine.GameState.setFromData(r);document.getElementById('game-over-overlay').classList.remove('active')}})})()">Play Again</button>
+</div>
+
+<script>
+window.__APP__ = {
+  user: {{ user | tojson }},
+  tokens: {{ tokens }},
+  stats: {{ stats | tojson }},
+  game: "plinko",
+  min_bet: {{ min_bet }}
+};
+(function() {
+  'use strict';
+  const GS = CasinoEngine.GameState;
+  const API = CasinoEngine.API;
+  const sound = CasinoEngine.sound;
+  GS.currentGame = 'plinko';
+
+  const canvas = document.getElementById('plinkoCanvas');
+  const ctx = canvas.getContext('2d');
+  const dropBtn = document.getElementById('dropBtn');
+  const betInput = document.getElementById('betInput');
+  const resultLine = document.getElementById('resultLine');
+  const multBar = document.getElementById('multiplierBar');
+
+  const ROWS = 12;
+  const SLOTS = 13;
+  const PAYOUTS = [29, 12, 5, 2, 1, 0.5, 0.3, 0.5, 1, 2, 5, 12, 29];
+  const PEG_RADIUS = 4;
+  const BALL_RADIUS = 6;
+
+  let pegs = [];
+  let ball = null;
+  let animId = null;
+  let dropping = false;
+  let betAmount = 0;
+  let currentBetId = null;
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    buildPegs();
+    draw();
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function buildPegs() {
+    pegs = [];
+    const w = canvas.width, h = canvas.height;
+    const topY = h * 0.08;
+    const bottomY = h * 0.82;
+    const rowH = (bottomY - topY) / ROWS;
+    for (let row = 0; row < ROWS; row++) {
+      const cols = row + 2;
+      const y = topY + row * rowH + rowH / 2;
+      const xStart = w * 0.08;
+      const xEnd = w * 0.92;
+      const spacing = (xEnd - xStart) / (cols - 1);
+      for (let col = 0; col < cols; col++) {
+        let x = xStart + col * spacing;
+        if (row % 2 === 1) x += spacing / 2;
+        pegs.push({ x: x, y: y, row: row, col: col, hit: false });
+      }
+    }
+  }
+
+  function draw() {
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillRect(0, h * 0.82, w, h * 0.18);
+
+    pegs.forEach(function(p) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, PEG_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = p.hit ? '#f472b6' : 'rgba(255,255,255,0.15)';
+      ctx.fill();
+      if (p.hit) {
+        ctx.shadowColor = '#f472b6';
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    });
+
+    for (let s = 0; s < SLOTS; s++) {
+      const x = w * 0.08 + (w * 0.84) * (s / (SLOTS - 1));
+      const y = h * 0.92;
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.font = (w * 0.028) + 'px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(PAYOUTS[s] + 'x', x, y);
+    }
+
+    if (ball) {
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BALL_RADIUS * 1.5, 0, Math.PI * 2);
+      const gradient = ctx.createRadialGradient(ball.x - 2, ball.y - 2, 0, ball.x, ball.y, BALL_RADIUS * 1.5);
+      gradient.addColorStop(0, 'rgba(255,255,255,0.9)');
+      gradient.addColorStop(0.3, '#f472b6');
+      gradient.addColorStop(0.7, '#ec4899');
+      gradient.addColorStop(1, '#be185d');
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.shadowColor = '#f472b6';
+      ctx.shadowBlur = 15;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      if (ball.trail) {
+        ball.trail.forEach(function(t, i) {
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, BALL_RADIUS * 0.4, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(244,114,182,' + (i / ball.trail.length * 0.3) + ')';
+          ctx.fill();
+        });
+      }
+    }
+  }
+
+  function renderMultiplierBar() {
+    multBar.innerHTML = '';
+    PAYOUTS.forEach(function(p, i) {
+      const div = document.createElement('div');
+      div.className = 'slot ' + (p >= 10 ? 'high' : p >= 2 ? 'med' : p >= 1 ? 'low' : 'zero');
+      div.textContent = p + 'x';
+      div.dataset.index = i;
+      multBar.appendChild(div);
+    });
+  }
+
+  async function dropBall() {
+    if (dropping) return;
+    const amt = parseInt(betInput.value) || CasinoEngine.MIN_BET;
+    if (amt > GS.balance) {
+      resultLine.textContent = 'Not enough chips!';
+      GS.checkGameOver();
+      return;
+    }
+    const result = await API.placeBet('plinko', amt);
+    if (!result.ok) {
+      resultLine.textContent = result.error || 'Bet failed';
+      return;
+    }
+    GS.balance = result.tokens;
+    currentBetId = result.bet_id;
+    betAmount = amt;
+    dropping = true;
+    dropBtn.disabled = true;
+    sound.click();
+
+    const w = canvas.width, h = canvas.height;
+    const xStart = w * 0.08;
+    const xEnd = w * 0.92;
+    const startX = xStart + (xEnd - xStart) * 0.5 + (Math.random() - 0.5) * (xEnd - xStart) * 0.3;
+
+    ball = {
+      x: startX,
+      y: h * 0.04,
+      vx: 0,
+      vy: 0,
+      trail: [],
+      landed: false,
+      slot: -1,
+      pegHits: 0,
+    };
+
+    pegs.forEach(function(p) { p.hit = false; });
+    document.querySelectorAll('.multiplier-bar .slot').forEach(function(s) { s.classList.remove('hit'); });
+    resultLine.textContent = '';
+
+    if (animId) cancelAnimationFrame(animId);
+    animId = requestAnimationFrame(simulate);
+    GS.updateUI();
+  }
+
+  function simulate() {
+    if (!ball || ball.landed) { draw(); return; }
+    const h = canvas.height;
+    const gravity = 0.35;
+    const friction = 0.98;
+
+    ball.vy += gravity;
+    ball.vx *= friction;
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    const bottomY = h * 0.82;
+    if (ball.y > bottomY) {
+      ball.y = bottomY;
+      ball.landed = true;
+      const w = canvas.width;
+      const xStart = w * 0.08;
+      const xEnd = w * 0.92;
+      const slotPos = (ball.x - xStart) / (xEnd - xStart);
+      ball.slot = Math.max(0, Math.min(SLOTS - 1, Math.round(slotPos * (SLOTS - 1))));
+      const multiplier = PAYOUTS[ball.slot];
+      const winAmount = Math.floor(betAmount * multiplier);
+
+      document.querySelectorAll('.multiplier-bar .slot').forEach(function(s) {
+        if (parseInt(s.dataset.index) === ball.slot) s.classList.add('hit');
+      });
+
+      if (multiplier >= 10) {
+        sound.jackpot();
+        const pt = new CasinoEngine.ParticleSystem();
+        pt.burst(70, ['#ec4899','#f472b6','#ffd700','#fbbf24','#22c55e']);
+        canvas.parentElement.classList.add('shake');
+        setTimeout(function() { canvas.parentElement.classList.remove('shake'); }, 500);
+      } else if (multiplier >= 2) {
+        sound.win();
+        const pt = new CasinoEngine.ParticleSystem();
+        pt.burst(30, ['#f472b6','#ffd700']);
+      } else if (multiplier >= 0.5) {
+        sound.win();
+      } else {
+        sound.lose();
+      }
+
+      GS.checkGameOver();
+
+      if (multiplier > 0) {
+        resultLine.textContent = 'Landed on ' + multiplier.toFixed(1) + 'x — won $' + winAmount + '!';
+      } else {
+        resultLine.textContent = 'Landed on 0x... Crystal shattered.';
+      }
+
+      // Record result after ball lands
+      if (multiplier > 0) {
+        API.recordWin(currentBetId, winAmount).then(function(r) {
+          if (r.ok) { GS.balance = r.tokens; GS.setStats(r.stats); GS.updateUI(); }
+        });
+      } else {
+        API.recordLoss(currentBetId).then(function(r) {
+          if (r.ok) { GS.balance = r.tokens; GS.setStats(r.stats); GS.updateUI(); }
+        });
+      }
+
+      setTimeout(function() {
+        dropping = false;
+        dropBtn.disabled = false;
+        ball = null;
+        draw();
+        if (animId) cancelAnimationFrame(animId);
+        animId = null;
+      }, 1000);
+      draw();
+      return;
+    }
+
+    let hitPeg = false;
+    pegs.forEach(function(p) {
+      const dx = ball.x - p.x;
+      const dy = ball.y - p.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < BALL_RADIUS * 1.5 + PEG_RADIUS && !p.hit && ball.vy > 0) {
+        p.hit = true;
+        hitPeg = true;
+        const angle = Math.atan2(dy, dx);
+        ball.vx += Math.cos(angle) * 2.5;
+        ball.vy *= -0.3;
+        ball.pegHits++;
+        sound.drop();
+      }
+    });
+
+    if (ball.trail.length > 30) ball.trail.shift();
+    ball.trail.push({ x: ball.x, y: ball.y });
+
+    draw();
+    animId = requestAnimationFrame(simulate);
+  }
+
+  dropBtn.addEventListener('click', function() {
+    if (GS.balance < CasinoEngine.MIN_BET) {
+      resultLine.textContent = 'Not enough chips!';
+      GS.checkGameOver();
+      return;
+    }
+    dropBall();
+  });
+
+  document.querySelectorAll('.bet-quick').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      betInput.value = parseInt(this.dataset.amount);
+      document.querySelectorAll('.bet-quick').forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      sound.click();
+    });
+  });
+
+  renderMultiplierBar();
+  resize();
+  GS.setFromData(window.__APP__);
+})();
+</script>
+</body>
+</html>

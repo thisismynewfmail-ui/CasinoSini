@@ -1,0 +1,25 @@
+{
+  "username": "Drew",
+  "name": "Drew",
+  "email": "ro@gmail.com",
+  "password": "1928",
+  "zip_code": "95472",
+  "role": "admin",
+  "ui": {
+    "theme": "shifting",
+    "font_size": 15,
+    "bubble_shape": "square"
+  },
+  "tokens": 1252,
+  "stats": {
+    "wins": 22,
+    "losses": 10,
+    "streak": 7,
+    "total_wagered": 1140,
+    "total_won": 1427,
+    "games_played": 32
+  },
+  "avatar_ts": 0,
+  "created": 1782005986,
+  "last_login": 1782012032
+}

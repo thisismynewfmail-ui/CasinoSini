@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Neon Casino · Admin</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/xp.css') }}">
+</head>
+<body class="theme-shifting fs-15">
+
+<div class="bliss" aria-hidden="true">
+    <div class="sun"></div>
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+    <div class="cloud c3"></div>
+    <div class="cloud c4"></div>
+</div>
+
+<div class="admin-frame">
+    <div class="window admin-window">
+        <div class="window-title">
+            <span class="ico"></span>
+            <span class="label">Neon Casino — Admin Controls</span>
+            <div class="controls">
+                <a href="/lobby" class="ctrl" style="text-decoration:none;">←</a>
+                <div class="ctrl" title="Maximize">□</div>
+                <a href="#" class="ctrl close" id="logout-btn" style="text-decoration:none;">×</a>
+            </div>
+        </div>
+
+        <div class="admin-tabs" role="tablist">
+            <div class="admin-tab active" data-section="dashboard">Dashboard</div>
+            <div class="admin-tab" data-section="users">Users</div>
+            <div class="admin-tab" data-section="network">Network</div>
+            <div class="admin-tab" data-section="casino">Casino</div>
+        </div>
+
+        <div class="admin-body" id="admin-body">
+
+            <!-- DASHBOARD -->
+            <div class="admin-section active" data-section="dashboard">
+                <div class="dash-header">
+                    <div class="dash-marquee">
+                        <span class="dash-eyebrow">// CASINO ——————— LIVE</span>
+                        <h2 class="dash-title">House Operations</h2>
+                        <p class="dash-sub">Live casino readout. Stats refresh every 30s.</p>
+                    </div>
+                    <div class="dash-status">
+                        <span class="dash-status-ring" aria-hidden="true">
+                            <span class="dash-status-pulse"></span>
+                        </span>
+                        <span class="dash-status-text">
+                            <span class="lbl">STATUS</span>
+                            <span class="val" id="dash-status-val">ONLINE</span>
+                            <span class="ts" id="dash-status-ts">—</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="dash-grid">
+                    <div class="dash-card">
+                        <div class="dash-card-head small">
+                            <span class="dash-card-tag">// 加入者</span>
+                            <span class="dash-card-title">Total Users</span>
+                        </div>
+                        <div class="dash-big" id="dash-total-users">—</div>
+                        <div class="dash-card-foot small">
+                            <span class="dash-card-foot-meta">admins <b id="dash-admin-count">—</b></span>
+                        </div>
+                    </div>
+
+                    <div class="dash-card">
+                        <div class="dash-card-head small">
+                            <span class="dash-card-tag">// チップ</span>
+                            <span class="dash-card-title">Chips in Circulation</span>
+                        </div>
+                        <div class="dash-big" id="dash-total-tokens">—</div>
+                    </div>
+
+                    <div class="dash-card">
+                        <div class="dash-card-head small">
+                            <span class="dash-card-tag">// 富豪</span>
+                            <span class="dash-card-title">Richest Player</span>
+                        </div>
+                        <div class="dash-big" id="dash-richest-name" style="font-size: 22px;">—</div>
+                        <div class="dash-card-foot small">
+                            <span class="dash-card-foot-meta"><b id="dash-richest-tokens">—</b> chips</span>
+                        </div>
+                    </div>
+
+                    <div class="dash-card">
+                        <div class="dash-card-head small">
+                            <span class="dash-card-tag">// 記録</span>
+                            <span class="dash-card-title">Total Games Played</span>
+                        </div>
+                        <div class="dash-big" id="dash-total-games">—</div>
+                    </div>
+
+                    <div class="dash-card">
+                        <div class="dash-card-head small">
+                            <span class="dash-card-tag">// 勝敗</span>
+                            <span class="dash-card-title">Wins / Losses</span>
+                        </div>
+                        <div class="dash-big" id="dash-win-loss" style="font-size: 22px;">—</div>
+                        <div class="dash-card-foot small">
+                            <span class="dash-card-foot-meta">net <b id="dash-net-won">—</b> chips</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dash-feedback" aria-hidden="true">
+                    <span>------- FEEDBACK TO BASE</span>
+                    <span class="dash-scan"></span>
+                    <span class="dash-refresh-tag" id="dash-refresh-tag">refresh in 30s</span>
+                </div>
+            </div>
+
+            <!-- USERS -->
+            <div class="admin-section" data-section="users">
+                <h2>Users</h2>
+                <p class="lede">Manage accounts, roles, and chip balances.</p>
+
+                <div class="card">
+                    <table class="users" id="user-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Chips</th>
+                                <th>W/L</th>
+                                <th>Games</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- NETWORK -->
+            <div class="admin-section" data-section="network">
+                <h2>Network</h2>
+                <p class="lede">Visibility on your local network.</p>
+
+                <div class="card">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                        <input type="checkbox" id="lan_visible" {% if config.server.lan_visible %}checked{% endif %}>
+                        Allow connections from other devices on the LAN
+                    </label>
+                    <small class="hint">When off, the server only binds to 127.0.0.1.</small>
+
+                    <label class="field" for="port" style="margin-top: 14px;">Port</label>
+                    <input type="number" id="port" min="1024" max="65535" value="{{ config.server.port }}">
+                    <small class="hint">Restart required after changing the port.</small>
+                </div>
+            </div>
+
+            <!-- CASINO -->
+            <div class="admin-section" data-section="casino">
+                <h2>Genie's Gold - Jackpot Config</h2>
+                <p class="lede">Configure progressive jackpot pools and odds for the slot machine.</p>
+
+                <div class="card">
+                    <label class="field" for="jackpotFeed">Jackpot Feed Percentage</label>
+                    <input type="number" id="jackpotFeed" min="0.5" max="10" step="0.5" value="1.5">
+                    <small class="hint">Percentage of each bet added to jackpot pools (0.5% - 10%).</small>
+
+                    <h3 style="margin-top: 18px; font-size: 14px; color: var(--text-secondary);">Current Pool Balances</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0;">
+                        <div class="card" style="padding: 10px; text-align: center;">
+                            <div style="font-size: 11px; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.08em;">Grand</div>
+                            <div style="font-size: 20px; font-weight: 800; color: #fff;" id="poolGrand">$5,000</div>
+                        </div>
+                        <div class="card" style="padding: 10px; text-align: center;">
+                            <div style="font-size: 11px; color: #c084fc; text-transform: uppercase; letter-spacing: 0.08em;">Major</div>
+                            <div style="font-size: 20px; font-weight: 800; color: #fff;" id="poolMajor">$500</div>
+                        </div>
+                        <div class="card" style="padding: 10px; text-align: center;">
+                            <div style="font-size: 11px; color: #22d3ee; text-transform: uppercase; letter-spacing: 0.08em;">Minor</div>
+                            <div style="font-size: 20px; font-weight: 800; color: #fff;" id="poolMinor">$100</div>
+                        </div>
+                        <div class="card" style="padding: 10px; text-align: center;">
+                            <div style="font-size: 11px; color: #4ade80; text-transform: uppercase; letter-spacing: 0.08em;">Mini</div>
+                            <div style="font-size: 20px; font-weight: 800; color: #fff;" id="poolMini">$25</div>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-top: 14px; font-size: 14px; color: var(--text-secondary);">Jackpot Tiers</h3>
+                    <div style="display: grid; gap: 12px; margin-top: 8px;">
+                        <div class="card" style="padding: 12px;">
+                            <div style="font-weight: 700; color: #fbbf24; margin-bottom: 8px;">Grand Jackpot</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Seed ($)</label><input type="number" id="grandSeed" min="0" step="100" value="5000" style="width: 100%; margin-top: 4px;"></div>
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Base Odds (1 in)</label><input type="number" id="grandOdds" min="100" step="100" value="100000" style="width: 100%; margin-top: 4px;"></div>
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Min Bet</label><input type="number" id="grandMinBet" min="1" value="10" style="width: 100%; margin-top: 4px;"></div>
+                            </div>
+                        </div>
+                        <div class="card" style="padding: 12px;">
+                            <div style="font-weight: 700; color: #c084fc; margin-bottom: 8px;">Major Jackpot</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Seed ($)</label><input type="number" id="majorSeed" min="0" step="50" value="500" style="width: 100%; margin-top: 4px;"></div>
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Base Odds (1 in)</label><input type="number" id="majorOdds" min="100" step="100" value="10000" style="width: 100%; margin-top: 4px;"></div>
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Min Bet</label><input type="number" id="majorMinBet" min="1" value="5" style="width: 100%; margin-top: 4px;"></div>
+                            </div>
+                        </div>
+                        <div class="card" style="padding: 12px;">
+                            <div style="font-weight: 700; color: #22d3ee; margin-bottom: 8px;">Minor Jackpot</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Seed ($)</label><input type="number" id="minorSeed" min="0" step="10" value="100" style="width: 100%; margin-top: 4px;"></div>
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Base Odds (1 in)</label><input type="number" id="minorOdds" min="10" step="100" value="1000" style="width: 100%; margin-top: 4px;"></div>
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Min Bet</label><input type="number" id="minorMinBet" min="1" value="5" style="width: 100%; margin-top: 4px;"></div>
+                            </div>
+                        </div>
+                        <div class="card" style="padding: 12px;">
+                            <div style="font-weight: 700; color: #4ade80; margin-bottom: 8px;">Mini Jackpot</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Seed ($)</label><input type="number" id="miniSeed" min="0" step="5" value="25" style="width: 100%; margin-top: 4px;"></div>
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Base Odds (1 in)</label><input type="number" id="miniOdds" min="10" step="10" value="200" style="width: 100%; margin-top: 4px;"></div>
+                                <div><label style="font-size: 11px; color: var(--text-secondary);">Min Bet</label><input type="number" id="miniMinBet" min="1" value="5" style="width: 100%; margin-top: 4px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sticky-actions">
+            <button class="btn ghost" id="btn-reload">Reload</button>
+            <button class="btn primary" id="btn-apply">Apply Settings</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="scanlines" aria-hidden="true"></div>
+
+<script>
+window.__ADMIN__ = {
+    config: {{ config | tojson }},
+};
+</script>
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

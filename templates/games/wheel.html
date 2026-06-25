@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Fortune Wheel - Neon Casino</title>
+<script src="{{ url_for('static', filename='js/engine.js') }}"></script>
+<style>
+.wheel-bg {
+  position: fixed; inset: 0; z-index: -1;
+  background: radial-gradient(ellipse at 50% 40%, rgba(255,215,0,0.06) 0%, transparent 60%), var(--bg-primary);
+}
+.game-title { color: #fbbf24; }
+.game-subtitle { color: rgba(251,191,36,0.6); }
+.wheel-canvas-wrap {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 1;
+  background: var(--bg-card);
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 0 auto 12px;
+  position: relative;
+  border: 3px solid rgba(255,215,0,0.15);
+  box-shadow: 0 0 40px rgba(255,215,0,0.08), inset 0 0 40px rgba(0,0,0,0.3);
+}
+#wheelCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.wheel-indicator {
+  position: absolute;
+  top: -12px; left: 50%;
+  transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 20px solid var(--accent-gold);
+  z-index: 5;
+  filter: drop-shadow(0 0 6px rgba(255,215,0,0.6));
+}
+.wheel-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  border: 3px solid var(--accent-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent-gold);
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: 0 0 20px rgba(255,215,0,0.2);
+}
+.wheel-controls {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.segment-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.segment-legend .leg {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.segment-legend .leg .swatch {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+}
+.result-line {
+  font-size: 14px;
+  text-align: center;
+  min-height: 24px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+</style>
+</head>
+<body>
+<div class="wheel-bg"></div>
+<a href="/lobby" class="back-btn">&#8592;</a>
+<div class="top-bar">
+  <div class="balance-wrap">
+    <span class="balance-label">Bankroll</span>
+    <span class="balance-value" data-value="{{ tokens }}">${{ tokens }}</span>
+  </div>
+  <div class="stats-wrap">
+    <span class="stat">&nbsp;<span class="stat-streak">{{ stats.streak }}</span></span>
+    <span class="stat">W<span class="stat-wins">{{ stats.wins }}</span></span>
+    <span class="stat">L<span class="stat-losses">{{ stats.losses }}</span></span>
+  </div>
+</div>
+
+<div class="page active">
+  <div class="game-title">&#127920; Fortune Wheel</div>
+  <div class="game-subtitle">Spin the wheel. Watch it decelerate. Claim your fate.</div>
+
+  <div class="wheel-canvas-wrap">
+    <canvas id="wheelCanvas"></canvas>
+    <div class="wheel-indicator"></div>
+    <div class="wheel-center">&#127920;</div>
+  </div>
+
+  <div class="segment-legend" id="segmentLegend"></div>
+
+  <div class="wheel-controls">
+    <div class="bet-area">
+      <div class="bet-row">
+        <div class="bet-input">
+          <span style="color:var(--text-secondary)">$</span>
+          <input type="number" id="betInput" value="10" min="5" step="5">
+        </div>
+        <button class="bet-quick" data-amount="10">10</button>
+        <button class="bet-quick" data-amount="25">25</button>
+        <button class="bet-quick" data-amount="50">50</button>
+        <button class="bet-quick" data-amount="100">100</button>
+      </div>
+    </div>
+    <button class="btn btn-gold btn-lg" id="spinBtn">&#127920; Spin the Wheel</button>
+  </div>
+  <div class="result-line" id="resultLine"></div>
+</div>
+
+<div id="game-over-overlay">
+  <h2>BANKRUPT</h2>
+  <p>Your chips have run out. Start a new session?</p>
+  <button class="btn btn-gold btn-lg" onclick="(function(){CasinoEngine.API.resetTokens().then(function(r){if(r.ok){CasinoEngine.GameState.setFromData(r);document.getElementById('game-over-overlay').classList.remove('active')}})})()">Play Again</button>
+</div>
+
+<script>
+window.__APP__ = {
+  user: {{ user | tojson }},
+  tokens: {{ tokens }},
+  stats: {{ stats | tojson }},
+  game: "wheel",
+  min_bet: {{ min_bet }}
+};
+(function() {
+  'use strict';
+  const GS = CasinoEngine.GameState;
+  const API = CasinoEngine.API;
+  const sound = CasinoEngine.sound;
+  GS.currentGame = 'wheel';
+
+  const canvas = document.getElementById('wheelCanvas');
+  const ctx = canvas.getContext('2d');
+  const spinBtn = document.getElementById('spinBtn');
+  const betInput = document.getElementById('betInput');
+  const resultLine = document.getElementById('resultLine');
+  const legendEl = document.getElementById('segmentLegend');
+
+  const SEGMENTS = 20;
+  const SEG_DATA = [
+    { mult: 5,  label: '5x',  color: '#ffd700', name: 'Jackpot' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 1.5, label: '1.5x', color: '#a78bfa', name: 'Nice' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 2,  label: '2x',  color: '#f87171', name: 'Good' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 1,  label: '1x',  color: '#60a5fa', name: 'OK' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 1.5, label: '1.5x', color: '#a78bfa', name: 'Nice' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 2,  label: '2x',  color: '#f87171', name: 'Good' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 1,  label: '1x',  color: '#60a5fa', name: 'OK' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 1,  label: '1x',  color: '#60a5fa', name: 'OK' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 3,  label: '3x',  color: '#34d399', name: 'Big' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+    { mult: 1,  label: '1x',  color: '#60a5fa', name: 'OK' },
+    { mult: 0,  label: '0x',  color: '#4a4a5a', name: 'Lose' },
+  ];
+
+  let angle = 0;
+  let spinning = false;
+  let animId = null;
+  let spinVelocity = 0;
+  let betAmount = 0;
+  let currentBetId = null;
+  let tickTimer = 0;
+  let lastSeg = -1;
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const size = rect.width * 2;
+    canvas.width = size;
+    canvas.height = size;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    drawWheel();
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function drawWheel() {
+    const w = canvas.width, h = canvas.height;
+    const cx = w / 2, cy = h / 2;
+    const r = Math.min(cx, cy) * 0.88;
+    ctx.clearRect(0, 0, w, h);
+
+    const segAngle = (Math.PI * 2) / SEGMENTS;
+
+    for (let i = 0; i < SEGMENTS; i++) {
+      const startAngle = angle + i * segAngle;
+      const endAngle = startAngle + segAngle;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, startAngle, endAngle);
+      ctx.closePath();
+
+      const seg = SEG_DATA[i];
+      ctx.fillStyle = seg.color;
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      const midAngle = startAngle + segAngle / 2;
+      const labelR = r * 0.65;
+      const lx = cx + Math.cos(midAngle) * labelR;
+      const ly = cy + Math.sin(midAngle) * labelR;
+
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(midAngle + Math.PI / 2);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold ' + (w * 0.035) + 'px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(seg.label, 0, 0);
+      ctx.restore();
+    }
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.08, 0, Math.PI * 2);
+    ctx.fillStyle = '#0d1117';
+    ctx.fill();
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  function renderLegend() {
+    const seen = {};
+    legendEl.innerHTML = '';
+    SEG_DATA.forEach(function(seg) {
+      if (seen[seg.name]) return;
+      seen[seg.name] = true;
+      const div = document.createElement('div');
+      div.className = 'leg';
+      div.innerHTML = '<span class="swatch" style="background:' + seg.color + '"></span> ' + seg.name + ' ' + seg.label;
+      legendEl.appendChild(div);
+    });
+  }
+
+  async function spin() {
+    if (spinning) return;
+    const amt = parseInt(betInput.value) || CasinoEngine.MIN_BET;
+    if (amt > GS.balance) {
+      resultLine.textContent = 'Not enough chips!';
+      GS.checkGameOver();
+      return;
+    }
+    const result = await API.placeBet('wheel', amt);
+    if (!result.ok) {
+      resultLine.textContent = result.error || 'Bet failed';
+      return;
+    }
+    GS.balance = result.tokens;
+    currentBetId = result.bet_id;
+    betAmount = amt;
+    spinning = true;
+    spinBtn.disabled = true;
+    resultLine.textContent = 'Spinning...';
+    sound.click();
+
+    spinVelocity = 0.25 + Math.random() * 0.15;
+    tickTimer = 0;
+    lastSeg = -1;
+
+    if (animId) cancelAnimationFrame(animId);
+    animId = requestAnimationFrame(updateSpin);
+    GS.updateUI();
+  }
+
+  function updateSpin() {
+    spinVelocity *= 0.985;
+    angle += spinVelocity;
+    tickTimer += spinVelocity;
+
+    const currentSeg = Math.floor((angle % (Math.PI * 2)) / (Math.PI * 2 / SEGMENTS)) % SEGMENTS;
+    if (currentSeg !== lastSeg) {
+      lastSeg = currentSeg;
+      sound.tick();
+    }
+
+    drawWheel();
+
+    if (spinVelocity > 0.001) {
+      animId = requestAnimationFrame(updateSpin);
+    } else {
+      resolveSpin();
+    }
+  }
+
+  function resolveSpin() {
+    const normalizedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const segIndex = Math.floor(normalizedAngle / (Math.PI * 2 / SEGMENTS)) % SEGMENTS;
+    const seg = SEG_DATA[segIndex];
+    const multiplier = seg.mult;
+    const winAmount = Math.floor(betAmount * multiplier);
+
+    if (multiplier > 0) {
+      API.recordWin(currentBetId, winAmount).then(function(r) {
+        if (r.ok) { GS.balance = r.tokens; GS.setStats(r.stats); GS.updateUI(); }
+      });
+      resultLine.textContent = 'Landed on ' + seg.name + '! ' + multiplier + 'x = $' + winAmount + '!';
+      if (multiplier >= 5) {
+        sound.jackpot();
+        const pt = new CasinoEngine.ParticleSystem();
+        pt.burst(80, ['#ffd700','#fbbf24','#f59e0b','#22c55e','#6366f1']);
+        canvas.parentElement.classList.add('shake');
+        setTimeout(function() { canvas.parentElement.classList.remove('shake'); }, 500);
+      } else if (multiplier >= 2) {
+        sound.bigWin();
+        const pt = new CasinoEngine.ParticleSystem();
+        pt.burst(40, ['#ffd700','#fbbf24']);
+      } else {
+        sound.win();
+      }
+    } else {
+      API.recordLoss(currentBetId).then(function(r) {
+        if (r.ok) { GS.balance = r.tokens; GS.setStats(r.stats); GS.updateUI(); }
+      });
+      resultLine.textContent = 'Landed on ' + seg.name + '. Better luck next spin.';
+      sound.lose();
+      canvas.parentElement.style.boxShadow = '0 0 40px rgba(239,68,68,0.2)';
+      setTimeout(function() {
+        canvas.parentElement.style.boxShadow = '0 0 40px rgba(255,215,0,0.08), inset 0 0 40px rgba(0,0,0,0.3)';
+      }, 600);
+    }
+    GS.checkGameOver();
+
+    canvas.parentElement.classList.add('shake');
+    setTimeout(function() { canvas.parentElement.classList.remove('shake'); }, 300);
+
+    setTimeout(function() {
+      spinning = false;
+      spinBtn.disabled = false;
+      animId = null;
+    }, 500);
+  }
+
+  spinBtn.addEventListener('click', function() {
+    if (GS.balance < CasinoEngine.MIN_BET) {
+      resultLine.textContent = 'Not enough chips!';
+      GS.checkGameOver();
+      return;
+    }
+    spin();
+  });
+
+  document.querySelectorAll('.bet-quick').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      betInput.value = parseInt(this.dataset.amount);
+      document.querySelectorAll('.bet-quick').forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      sound.click();
+    });
+  });
+
+  renderLegend();
+  drawWheel();
+  GS.setFromData(window.__APP__);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Aether Crash - Neon Casino</title>
+<script src="{{ url_for('static', filename='js/engine.js') }}"></script>
+<style>
+.crash-bg {
+  position: fixed; inset: 0; z-index: -1;
+  background: radial-gradient(ellipse at 50% 30%, rgba(124,58,237,0.10) 0%, transparent 60%), var(--bg-primary);
+}
+.game-title { color: #a78bfa; }
+.game-subtitle { color: rgba(167,139,250,0.6); }
+.crash-canvas-wrap {
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 4/3;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 12px;
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+#crashCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.multiplier-display {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  font-size: 52px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 30px rgba(124,58,237,0.5);
+  transition: color 0.3s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+.multiplier-display.crashed { color: var(--accent-red); }
+.multiplier-display.riding { color: var(--accent-gold); }
+.multiplier-display.cashed { color: var(--accent-green); }
+.crash-controls {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.crash-bet-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cashout-section {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+.cashout-section .btn {
+  flex: 1;
+}
+#cashoutBtn {
+  display: none;
+}
+#cashoutBtn.show { display: flex; }
+#betBtn.hide { display: none; }
+.result-line {
+  font-size: 14px;
+  text-align: center;
+  min-height: 24px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.crash-history {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+  max-width: 420px;
+}
+.crash-history .dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.crash-history .dot.high { background: rgba(167,139,250,0.2); color: #a78bfa; }
+.crash-history .dot.med { background: rgba(251,191,36,0.2); color: #fbbf24; }
+.crash-history .dot.low { background: rgba(34,197,94,0.2); color: #22c55e; }
+.crash-history .dot.bust { background: rgba(239,68,68,0.2); color: #ef4444; }
+@media (max-width: 400px) {
+  .multiplier-display { font-size: 36px; }
+}
+</style>
+</head>
+<body>
+<div class="crash-bg"></div>
+<a href="/lobby" class="back-btn">&#8592;</a>
+<div class="top-bar">
+  <div class="balance-wrap">
+    <span class="balance-label">Bankroll</span>
+    <span class="balance-value" data-value="{{ tokens }}">${{ tokens }}</span>
+  </div>
+  <div class="stats-wrap">
+    <span class="stat">&nbsp;<span class="stat-streak">{{ stats.streak }}</span></span>
+    <span class="stat">W<span class="stat-wins">{{ stats.wins }}</span></span>
+    <span class="stat">L<span class="stat-losses">{{ stats.losses }}</span></span>
+  </div>
+</div>
+
+<div class="page active">
+  <div class="game-title">&#128640; Aether Crash</div>
+  <div class="game-subtitle">Ride the multiplier. Cash out before it explodes.</div>
+
+  <div class="crash-canvas-wrap">
+    <canvas id="crashCanvas"></canvas>
+    <div class="multiplier-display" id="multiplierDisplay">1.00x</div>
+  </div>
+
+  <div class="crash-controls">
+    <div class="bet-area">
+      <div class="bet-row">
+        <div class="bet-input">
+          <span style="color:var(--text-secondary)">$</span>
+          <input type="number" id="betInput" value="10" min="5" step="5">
+        </div>
+        <button class="bet-quick" data-amount="10">10</button>
+        <button class="bet-quick" data-amount="25">25</button>
+        <button class="bet-quick" data-amount="50">50</button>
+        <button class="bet-quick" data-amount="100">100</button>
+      </div>
+    </div>
+    <div class="cashout-section">
+      <button class="btn btn-gold btn-lg" id="betBtn" style="flex:1">&#9654; Launch</button>
+      <button class="btn btn-green btn-lg" id="cashoutBtn">&#128176; Cash Out</button>
+    </div>
+  </div>
+  <div class="result-line" id="resultLine"></div>
+  <div class="crash-history" id="crashHistory"></div>
+</div>
+
+<div id="game-over-overlay">
+  <h2>BANKRUPT</h2>
+  <p>Your chips have run out. Start a new session?</p>
+  <button class="btn btn-gold btn-lg" onclick="(function(){CasinoEngine.API.resetTokens().then(function(r){if(r.ok){CasinoEngine.GameState.setFromData(r);document.getElementById('game-over-overlay').classList.remove('active')}})})()">Play Again</button>
+</div>
+
+<script>
+window.__APP__ = {
+  user: {{ user | tojson }},
+  tokens: {{ tokens }},
+  stats: {{ stats | tojson }},
+  game: "crash",
+  min_bet: {{ min_bet }}
+};
+(function() {
+  'use strict';
+  const GS = CasinoEngine.GameState;
+  const API = CasinoEngine.API;
+  const sound = CasinoEngine.sound;
+  GS.currentGame = 'crash';
+
+  const canvas = document.getElementById('crashCanvas');
+  const ctx = canvas.getContext('2d');
+  const multDisplay = document.getElementById('multiplierDisplay');
+  const betInput = document.getElementById('betInput');
+  const betBtn = document.getElementById('betBtn');
+  const cashoutBtn = document.getElementById('cashoutBtn');
+  const resultLine = document.getElementById('resultLine');
+  const historyEl = document.getElementById('crashHistory');
+
+  let state = 'idle';
+  let currentMultiplier = 1.0;
+  let crashPoint = 0;
+  let animId = null;
+  let startTime = 0;
+  let betAmount = 0;
+  let currentBetId = null;
+  let cashedOut = false;
+  let history = [];
+  let graphPoints = [];
+
+  function resize() {
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  document.querySelectorAll('.bet-quick').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      betInput.value = parseInt(this.dataset.amount);
+      document.querySelectorAll('.bet-quick').forEach(function(b) { b.classList.remove('active'); });
+      this.classList.add('active');
+      sound.click();
+    });
+  });
+
+  function generateCrashPoint() {
+    const r = Math.random();
+    if (r < 0.05) return 1.0;
+    const point = Math.floor((0.95 / (r - 0.05)) * 100) / 100;
+    return Math.max(1.0, Math.min(point, 100));
+  }
+
+  function drawGraph() {
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    const pad = 20;
+    const gW = w - pad * 2;
+    const gH = h - pad * 2;
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      const y = pad + (gH / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(pad, y);
+      ctx.lineTo(w - pad, y);
+      ctx.stroke();
+    }
+
+    if (graphPoints.length < 2) return;
+    const maxMult = Math.max(2, currentMultiplier * 1.2);
+    ctx.beginPath();
+    ctx.strokeStyle = '#a78bfa';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(124,58,237,0.5)';
+    ctx.shadowBlur = 10;
+    for (let i = 0; i < graphPoints.length; i++) {
+      const x = pad + (i / (graphPoints.length - 1)) * gW;
+      const y = pad + gH - (Math.min(graphPoints[i], maxMult) / maxMult) * gH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const lastY = pad + gH - (Math.min(currentMultiplier, maxMult) / maxMult) * gH;
+    const lastX = pad + gW;
+    ctx.fillStyle = state === 'crashed' ? '#ef4444' : state === 'cashed' ? '#22c55e' : '#a78bfa';
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  async function startRound() {
+    const amt = parseInt(betInput.value) || CasinoEngine.MIN_BET;
+    if (amt > GS.balance) {
+      resultLine.textContent = 'Not enough chips!';
+      GS.checkGameOver();
+      return;
+    }
+    const result = await API.placeBet('crash', amt);
+    if (!result.ok) {
+      resultLine.textContent = result.error || 'Bet failed';
+      return;
+    }
+    GS.balance = result.tokens;
+    currentBetId = result.bet_id;
+    betAmount = amt;
+    state = 'flying';
+    currentMultiplier = 1.0;
+    crashPoint = generateCrashPoint();
+    cashedOut = false;
+    startTime = performance.now();
+    graphPoints = [1.0];
+    multDisplay.textContent = '1.00x';
+    multDisplay.className = 'multiplier-display riding';
+    betBtn.classList.add('hide');
+    cashoutBtn.classList.add('show');
+    resultLine.textContent = '';
+    sound.spinStart();
+    if (animId) cancelAnimationFrame(animId);
+    animId = requestAnimationFrame(update);
+    GS.updateUI();
+  }
+
+  function update(now) {
+    const elapsed = (now - startTime) / 1000;
+    currentMultiplier = 1.0 + elapsed * 2.5 * (1 + elapsed * 0.3);
+    currentMultiplier = Math.floor(currentMultiplier * 100) / 100;
+    graphPoints.push(currentMultiplier);
+    multDisplay.textContent = currentMultiplier.toFixed(2) + 'x';
+
+    if (currentMultiplier >= crashPoint) {
+      crash();
+      return;
+    }
+
+    const green = Math.min(255, Math.floor(180 + (currentMultiplier / 5) * 75));
+    multDisplay.style.color = 'rgb(255, ' + green + ', 0)';
+    drawGraph();
+
+    if (currentMultiplier > 2) {
+      const intensity = Math.min(1, (currentMultiplier - 2) / 10);
+      canvas.parentElement.style.boxShadow = '0 0 ' + (20 * intensity) + 'px rgba(124,58,237,' + (0.15 * intensity) + ')';
+    }
+
+    animId = requestAnimationFrame(update);
+  }
+
+  async function cashOut() {
+    if (state !== 'flying' || cashedOut) return;
+    cashedOut = true;
+    state = 'cashed';
+    if (animId) cancelAnimationFrame(animId);
+    sound.cashOut();
+    const winAmount = Math.floor(betAmount * currentMultiplier);
+    const result = await API.recordWin(currentBetId, winAmount);
+    if (result.ok) {
+      GS.balance = result.tokens;
+      GS.setStats(result.stats);
+    }
+    GS.checkGameOver();
+    multDisplay.className = 'multiplier-display cashed';
+    resultLine.textContent = 'Cashed out at ' + currentMultiplier.toFixed(2) + 'x for $' + winAmount + '!';
+    history.unshift({ type: 'cash', val: currentMultiplier });
+    if (history.length > 30) history.pop();
+    renderHistory();
+    resetUI();
+    const pt = new CasinoEngine.ParticleSystem();
+    pt.burst(30, ['#22c55e','#6366f1','#ffd700']);
+    canvas.parentElement.style.boxShadow = '0 0 30px rgba(34,197,94,0.2)';
+    setTimeout(function() { canvas.parentElement.style.boxShadow = ''; }, 1000);
+  }
+
+  async function crash() {
+    state = 'crashed';
+    if (animId) cancelAnimationFrame(animId);
+    sound.explosion();
+    multDisplay.className = 'multiplier-display crashed';
+    multDisplay.textContent = crashPoint.toFixed(2) + 'x';
+
+    const pt = new CasinoEngine.ParticleSystem();
+    pt.burst(40, ['#ef4444','#dc2626','#f87171','#ffd700']);
+
+    canvas.parentElement.classList.add('shake');
+    setTimeout(function() { canvas.parentElement.classList.remove('shake'); }, 500);
+    canvas.parentElement.style.boxShadow = '0 0 40px rgba(239,68,68,0.3)';
+    setTimeout(function() { canvas.parentElement.style.boxShadow = ''; }, 800);
+
+    if (!cashedOut) {
+      const lossResult = await API.recordLoss(currentBetId);
+      if (lossResult.ok) {
+        GS.balance = lossResult.tokens;
+        GS.setStats(lossResult.stats);
+      }
+      GS.checkGameOver();
+      const pct = Math.floor((currentMultiplier / crashPoint) * 100);
+      if (pct > 85) {
+        resultLine.textContent = 'So close! It crashed at ' + crashPoint.toFixed(2) + 'x — you were at ' + currentMultiplier.toFixed(2) + 'x!';
+      } else {
+        resultLine.textContent = 'Crashed at ' + crashPoint.toFixed(2) + 'x. Next time, cash out earlier.';
+      }
+      history.unshift({ type: 'crash', val: crashPoint });
+    } else {
+      history.unshift({ type: 'crash', val: crashPoint });
+    }
+    if (history.length > 30) history.pop();
+    renderHistory();
+    drawGraph();
+    setTimeout(resetUI, 1500);
+  }
+
+  function resetUI() {
+    state = 'idle';
+    betBtn.classList.remove('hide');
+    cashoutBtn.classList.remove('show');
+    sound.spinStop();
+  }
+
+  function renderHistory() {
+    historyEl.innerHTML = history.map(function(h) {
+      var cls = h.val >= 10 ? 'high' : h.val >= 3 ? 'med' : h.val >= 1.5 ? 'low' : 'bust';
+      return '<div class="dot ' + cls + '">' + h.val.toFixed(1) + 'x</div>';
+    }).join('');
+  }
+
+  betBtn.addEventListener('click', function() {
+    sound.click();
+    if (GS.balance < CasinoEngine.MIN_BET) {
+      resultLine.textContent = 'Not enough chips!';
+      GS.checkGameOver();
+      return;
+    }
+    startRound();
+  });
+
+  cashoutBtn.addEventListener('click', function() {
+    if (state === 'flying') cashOut();
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (state === 'idle' || state === 'crashed' || state === 'cashed') betBtn.click();
+      else if (state === 'flying') cashOut();
+    }
+  });
+
+  renderHistory();
+  GS.setFromData(window.__APP__);
+})();
+</script>
+</body>
+</html>
