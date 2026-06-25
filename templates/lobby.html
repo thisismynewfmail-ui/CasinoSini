@@ -194,11 +194,14 @@
 }
 .atk-footer {
   font-size: 11px;
+  line-height: 1.7;
   color: var(--text-secondary);
   text-align: center;
-  opacity: 0.5;
-  padding-bottom: 20px;
+  opacity: 0.6;
+  max-width: 460px;
+  padding: 0 16px 24px;
 }
+.atk-footer b { color: var(--text-primary); opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -276,7 +279,10 @@
   <button class="btn btn-gold btn-lg" onclick="CasinoEngine.API.resetTokens().then(function(r){if(r.ok){CasinoEngine.GameState.setFromData(r);document.getElementById('game-over-overlay').classList.remove('active')}});">Play Again</button>
 </div>
 
-<div class="atk-footer">All games are provably fair. House edge 3-7%.</div>
+<div class="atk-footer">
+  <b>Play-money simulator</b> &middot; no real cash, no deposits, no payouts. Reset your chips free anytime.<br>
+  Feeling the pull of real-money gambling? Call or text <b>1-800-522-4700</b> &mdash; free &amp; confidential, 24/7.
+</div>
 
 <script>
 window.__APP__ = {

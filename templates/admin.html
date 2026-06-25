@@ -4,17 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Neon Casino · Admin</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/xp.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/casino.css') }}">
 </head>
-<body class="theme-shifting fs-15">
+<body>
 
-<div class="bliss" aria-hidden="true">
-    <div class="sun"></div>
-    <div class="cloud c1"></div>
-    <div class="cloud c2"></div>
-    <div class="cloud c3"></div>
-    <div class="cloud c4"></div>
-</div>
+<div class="casino-bg" aria-hidden="true"></div>
 
 <div class="admin-frame">
     <div class="window admin-window">
@@ -41,7 +35,7 @@
             <div class="admin-section active" data-section="dashboard">
                 <div class="dash-header">
                     <div class="dash-marquee">
-                        <span class="dash-eyebrow">// CASINO ——————— LIVE</span>
+                        <span class="dash-eyebrow">&#9670; CASINO &mdash; LIVE</span>
                         <h2 class="dash-title">House Operations</h2>
                         <p class="dash-sub">Live casino readout. Stats refresh every 30s.</p>
                     </div>
@@ -60,7 +54,7 @@
                 <div class="dash-grid">
                     <div class="dash-card">
                         <div class="dash-card-head small">
-                            <span class="dash-card-tag">// 加入者</span>
+                            <span class="dash-card-tag">// PLAYERS</span>
                             <span class="dash-card-title">Total Users</span>
                         </div>
                         <div class="dash-big" id="dash-total-users">—</div>
@@ -71,7 +65,7 @@
 
                     <div class="dash-card">
                         <div class="dash-card-head small">
-                            <span class="dash-card-tag">// チップ</span>
+                            <span class="dash-card-tag">// CHIPS</span>
                             <span class="dash-card-title">Chips in Circulation</span>
                         </div>
                         <div class="dash-big" id="dash-total-tokens">—</div>
@@ -79,7 +73,7 @@
 
                     <div class="dash-card">
                         <div class="dash-card-head small">
-                            <span class="dash-card-tag">// 富豪</span>
+                            <span class="dash-card-tag">// HIGH ROLLER</span>
                             <span class="dash-card-title">Richest Player</span>
                         </div>
                         <div class="dash-big" id="dash-richest-name" style="font-size: 22px;">—</div>
@@ -90,7 +84,7 @@
 
                     <div class="dash-card">
                         <div class="dash-card-head small">
-                            <span class="dash-card-tag">// 記録</span>
+                            <span class="dash-card-tag">// ROUNDS</span>
                             <span class="dash-card-title">Total Games Played</span>
                         </div>
                         <div class="dash-big" id="dash-total-games">—</div>
@@ -98,7 +92,7 @@
 
                     <div class="dash-card">
                         <div class="dash-card-head small">
-                            <span class="dash-card-tag">// 勝敗</span>
+                            <span class="dash-card-tag">// WIN / LOSS</span>
                             <span class="dash-card-title">Wins / Losses</span>
                         </div>
                         <div class="dash-big" id="dash-win-loss" style="font-size: 22px;">—</div>
@@ -109,7 +103,7 @@
                 </div>
 
                 <div class="dash-feedback" aria-hidden="true">
-                    <span>------- FEEDBACK TO BASE</span>
+                    <span>&#9670; HOUSE WIRE</span>
                     <span class="dash-scan"></span>
                     <span class="dash-refresh-tag" id="dash-refresh-tag">refresh in 30s</span>
                 </div>
@@ -234,7 +228,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="scanlines" aria-hidden="true"></div>
 
 <script>
 window.__ADMIN__ = {
