@@ -560,13 +560,6 @@ window.__APP__ = {
     }
   }
 
-  // NOTE: earlier builds manufactured fake "near-miss" boards and forced
-  // low-symbol wins here by overwriting the reels after the spin. Those are
-  // loss-chasing dark patterns, so they have been removed — what you see on
-  // the reels is now the honest, randomly-drawn result, nothing else.
-
-  // Genie's Blessing is a genuine *bonus* (it only ever adds wilds in the
-  // player's favour), so it stays.
   function applyGeniesBlessing() {
     if (Math.random() < 0.10) {
       const wCount = 1 + Math.floor(Math.random() * 2);
@@ -797,9 +790,6 @@ window.__APP__ = {
       }
     }
 
-    // Anticipation: once 2+ scatters have actually landed on stopped reels
-    // and others are still spinning, light up the frame. This is honest —
-    // it reacts to the real board, it does not change any outcome.
     let landedScatters = 0;
     for (let c = 0; c < COLS; c++) {
       if (spinPhase[c].stopped) {
@@ -887,7 +877,7 @@ window.__APP__ = {
     return true;
   }
 
-  // ===================== WIN PRESENTATION (honest juice) =====================
+  // ===================== WIN PRESENTATION =====================
   let winAnimToken = 0;
 
   // Eased count-up for any text element. `fmt(value)` builds the label.
@@ -1026,7 +1016,7 @@ window.__APP__ = {
       totalWin = Math.floor(totalWin * 2);
     }
 
-    const isMiniWin = false; // LDWs removed — a "win" must be a real payline win.
+    const isMiniWin = false;
 
     if (totalWin > 0) {
       celebrateWin(totalWin, winLines);

@@ -3,8 +3,6 @@
 (function() {
   const CSS = `
 :root {
-  /* Midnight-velvet base — a deep, warm violet-black with real depth,
-     a step up from the old flat slate-gray. */
   --bg-primary: #0a0713;
   --bg-deep: #06040d;
   --bg-card: #17111f;
