@@ -9,27 +9,27 @@
    ========================================================================= */
 
 :root {
-  --bg-primary:    #0d1117;
-  --bg-deep:       #090c10;
-  --bg-card:       #161b22;
-  --bg-card-hover: #1c2333;
-  --bg-elevated:   #1f2630;
+  --bg-primary:    #0a0713;
+  --bg-deep:       #06040d;
+  --bg-card:       #17111f;
+  --bg-card-hover: #221830;
+  --bg-elevated:   #1c1528;
 
-  --accent-gold:   #ffd700;
-  --accent-amber:  #f59e0b;
+  --accent-gold:   #ffd24a;
+  --accent-amber:  #f5a524;
   --accent-indigo: #6366f1;
-  --accent-green:  #22c55e;
-  --accent-red:    #ef4444;
-  --accent-purple: #7c3aed;
-  --accent-cyan:   #06b6d4;
-  --accent-pink:   #ec4899;
+  --accent-green:  #2ee06a;
+  --accent-red:    #ff4d5e;
+  --accent-purple: #a855f7;
+  --accent-cyan:   #22d3ee;
+  --accent-pink:   #f472d0;
 
-  --text-primary:   #f0f6fc;
-  --text-secondary: #8b949e;
-  --text-faint:     #5b636d;
+  --text-primary:   #f5f1ff;
+  --text-secondary: #9d93b8;
+  --text-faint:     #6b6386;
 
-  --line:        rgba(255,255,255,0.06);
-  --line-strong: rgba(255,255,255,0.12);
+  --line:        rgba(255,255,255,0.07);
+  --line-strong: rgba(255,255,255,0.14);
 
   --font-main: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
@@ -68,15 +68,16 @@ html, body {
   z-index: -1;
   overflow: hidden;
   background:
-    radial-gradient(ellipse 60% 50% at 18% 12%, rgba(99,102,241,0.10), transparent 55%),
-    radial-gradient(ellipse 55% 50% at 85% 18%, rgba(124,58,237,0.10), transparent 55%),
-    radial-gradient(ellipse 70% 60% at 50% 100%, rgba(255,215,0,0.05), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 50% -8%, rgba(168,85,247,0.20), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 12% 24%, rgba(99,102,241,0.14), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 88% 28%, rgba(244,114,208,0.10), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 50% 110%, rgba(255,210,74,0.07), transparent 60%),
     var(--bg-primary);
-  animation: bgDrift 18s ease-in-out infinite alternate;
+  animation: bgDrift 20s ease-in-out infinite alternate;
 }
 @keyframes bgDrift {
-  0%   { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
-  100% { background-position: 8% 14%, 92% 12%, 46% 92%, 0 0; }
+  0%   { background-position: 0% 0%, 100% 0%, 0% 0%, 50% 100%, 0 0; }
+  100% { background-position: 6% 12%, 92% 14%, 8% 10%, 46% 92%, 0 0; }
 }
 /* Faint chip-grid texture over the field. */
 .bliss::before,

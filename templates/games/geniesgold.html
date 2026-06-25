@@ -9,8 +9,8 @@
 .geniesgold-bg {
   position: fixed; inset: 0; z-index: -1;
   background:
-    radial-gradient(ellipse at 50% 20%, rgba(168,85,247,0.12) 0%, transparent 50%),
-    radial-gradient(ellipse at 30% 80%, rgba(255,215,0,0.06) 0%, transparent 40%),
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(217,70,239,0.20), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 30% 95%, rgba(255,210,74,0.12), transparent 55%),
     var(--bg-primary);
 }
 .game-title { color: #c084fc; text-shadow: 0 0 20px rgba(168,85,247,0.3); }
@@ -184,6 +184,29 @@
   50% { box-shadow: 0 0 40px rgba(168,85,247,0.3); }
 }
 .reel-wrap.spinning { animation: reelGlow 0.5s ease infinite; }
+
+/* Big-win flash sweep over the reels. */
+.reel-wrap.flash::after {
+  content: ''; position: absolute; inset: 0; z-index: 5;
+  pointer-events: none; border-radius: inherit;
+  background: radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.6), rgba(255,210,74,0.22) 40%, transparent 72%);
+  animation: reelFlash 0.48s ease forwards;
+}
+@keyframes reelFlash { 0% { opacity: 0; } 22% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Scatter anticipation — frame pulses gold while the last reels spin. */
+.reel-wrap.anticipation { border-color: rgba(255,210,74,0.6); animation: anticipationGlow 0.45s ease infinite; }
+@keyframes anticipationGlow {
+  0%, 100% { box-shadow: 0 0 24px rgba(255,210,74,0.25), inset 0 0 40px rgba(0,0,0,0.3); }
+  50% { box-shadow: 0 0 48px rgba(255,210,74,0.55), inset 0 0 40px rgba(0,0,0,0.3); }
+}
+
+/* The spin button breathes gently while idle so the table feels alive. */
+@keyframes spinIdle {
+  0%, 100% { box-shadow: 0 0 18px rgba(255,210,74,0.25); }
+  50% { box-shadow: 0 0 30px rgba(255,210,74,0.5); }
+}
+.spin-btn:not(:disabled) { animation: spinIdle 2.4s ease-in-out infinite; }
 
 .result-line {
   font-size: 14px;
@@ -537,23 +560,13 @@ window.__APP__ = {
     }
   }
 
-  function forceNearMiss() {
-    if (Math.random() < 0.35) {
-      const sym = Math.floor(Math.random() * 8);
-      reelSymbols[0][1] = sym;
-      reelSymbols[1][1] = sym;
-    }
-  }
+  // NOTE: earlier builds manufactured fake "near-miss" boards and forced
+  // low-symbol wins here by overwriting the reels after the spin. Those are
+  // loss-chasing dark patterns, so they have been removed — what you see on
+  // the reels is now the honest, randomly-drawn result, nothing else.
 
-  function forceMiniWin() {
-    if (Math.random() < 0.4) {
-      const sym = Math.floor(Math.random() * 6);
-      reelSymbols[0][1] = sym;
-      reelSymbols[1][1] = sym;
-      reelSymbols[2][1] = sym;
-    }
-  }
-
+  // Genie's Blessing is a genuine *bonus* (it only ever adds wilds in the
+  // player's favour), so it stays.
   function applyGeniesBlessing() {
     if (Math.random() < 0.10) {
       const wCount = 1 + Math.floor(Math.random() * 2);
@@ -753,6 +766,18 @@ window.__APP__ = {
       }
     }
 
+    // Anticipation: once 2+ scatters have actually landed on stopped reels
+    // and others are still spinning, light up the frame. This is honest —
+    // it reacts to the real board, it does not change any outcome.
+    let landedScatters = 0;
+    for (let c = 0; c < COLS; c++) {
+      if (spinPhase[c].stopped) {
+        for (let r = 0; r < ROWS; r++) if (reelSymbols[c][r] === SCATTER_IDX) landedScatters++;
+      }
+    }
+    if (!allStopped && landedScatters >= 2) reelWrap.classList.add('anticipation');
+    else reelWrap.classList.remove('anticipation');
+
     drawReels();
 
     if (!allStopped) {
@@ -831,51 +856,156 @@ window.__APP__ = {
     return true;
   }
 
-  // ===================== RESULT PROCESSING =====================
-  function onReelsStopped() {
-    reelWrap.classList.remove('spinning');
-    const wins = evaluatePaylines();
-    let totalWin = 0;
-    wins.forEach(function(w) {
-      if (!w.isScatter) totalWin += Math.floor(betAmount / 20 * w.pay * 20);
-    });
+  // ===================== WIN PRESENTATION (honest juice) =====================
+  let winAnimToken = 0;
 
-    let isMiniWin = false;
-    if (totalWin === 0) {
-      if (Math.random() < 0.40) {
-        totalWin = Math.floor(betAmount * (0.5 + Math.random() * 0.45));
-        isMiniWin = true;
-        wins.length = 0;
+  // Eased count-up for any text element. `fmt(value)` builds the label.
+  function countUp(el, from, to, dur, fmt) {
+    const start = performance.now();
+    function step(now) {
+      const k = Math.min(1, (now - start) / dur);
+      const v = Math.floor(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+      el.textContent = fmt ? fmt(v) : String(v);
+      if (k < 1) requestAnimationFrame(step);
+      else el.textContent = fmt ? fmt(to) : String(to);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // Which board cells are part of a winning line (up to the matched length).
+  function winningCellsFromLines(winLines) {
+    const cells = [];
+    winLines.forEach(function(w) {
+      const line = PAYLINES[w.line];
+      for (let c = 0; c < Math.min(w.count, COLS); c++) cells.push(c + ',' + line[c]);
+    });
+    return cells;
+  }
+
+  // Redraw the board, making winning cells pulse and glow.
+  function drawReelsWithGlow(cellKeys, pulse) {
+    const w = canvas.width / 2, h = canvas.height / 2;
+    ctx.clearRect(0, 0, w, h);
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        const x = 10 + c * cellW, y = 5 + r * cellH;
+        ctx.fillStyle = (c + r) % 2 === 0 ? 'rgba(168,85,247,0.06)' : 'rgba(168,85,247,0.03)';
+        ctx.fillRect(x, y, cellW - 2, cellH - 2);
+        ctx.strokeStyle = 'rgba(168,85,247,0.12)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, cellW - 2, cellH - 2);
       }
     }
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        const symIdx = reelSymbols[c] ? reelSymbols[c][r] : 0;
+        const sym = SYMBOLS[symIdx];
+        const x = 10 + c * cellW, y = 5 + r * cellH;
+        const isWin = cellKeys.indexOf(c + ',' + r) !== -1;
+        let scale = 1;
+        if (isWin) {
+          ctx.fillStyle = 'rgba(255,210,74,' + (0.10 + 0.14 * pulse) + ')';
+          ctx.fillRect(x, y, cellW - 2, cellH - 2);
+          ctx.strokeStyle = 'rgba(255,210,74,' + (0.5 + 0.4 * pulse) + ')';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 1, y + 1, cellW - 4, cellH - 4);
+          scale = 1 + 0.14 * pulse;
+          ctx.shadowColor = sym.color;
+          ctx.shadowBlur = 10 + 12 * pulse;
+        } else if (sym.isWild || sym.isScatter) {
+          ctx.shadowColor = sym.color;
+          ctx.shadowBlur = 12;
+        }
+        ctx.fillStyle = sym.color;
+        ctx.font = 'bold ' + Math.floor(cellH * 0.5 * scale) + 'px system-ui';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(sym.label, x + cellW / 2 - 1, y + cellH / 2);
+        ctx.shadowBlur = 0;
+      }
+    }
+  }
+
+  function reelFlash() {
+    reelWrap.classList.add('flash');
+    setTimeout(function() { reelWrap.classList.remove('flash'); }, 480);
+  }
+
+  // Celebrate a real win: tiered sound + confetti, a count-up label, and an
+  // animated cycle through the winning paylines with the symbols glowing.
+  function celebrateWin(totalWin, winLines) {
+    const ratio = totalWin / Math.max(1, betAmount);
+    let label = 'WIN';
+    let colors = ['#ffd24a', '#c084fc'];
+    if (ratio >= 20) {
+      label = 'EPIC WIN'; colors = ['#ffd24a','#fbbf24','#a855f7','#22c55e','#06b6d4'];
+      sound.jackpot(); reelFlash();
+      reelWrap.classList.add('shake');
+      setTimeout(function() { reelWrap.classList.remove('shake'); }, 900);
+      new CasinoEngine.ParticleSystem().burst(120, colors);
+    } else if (ratio >= 8) {
+      label = 'MEGA WIN'; colors = ['#ffd24a','#fbbf24','#a855f7'];
+      sound.jackpot(); reelFlash();
+      new CasinoEngine.ParticleSystem().burst(80, colors);
+    } else if (ratio >= 3) {
+      label = 'BIG WIN';
+      sound.bigWin();
+      new CasinoEngine.ParticleSystem().burst(45, colors);
+    } else {
+      sound.win();
+    }
+
+    resultLine.className = 'result-line win';
+    countUp(resultLine, 0, totalWin, 700, function(v) { return label + '  +$' + v.toLocaleString(); });
+
+    const cells = winningCellsFromLines(winLines);
+    const myToken = ++winAnimToken;
+    const start = performance.now();
+    (function frame(now) {
+      if (myToken !== winAnimToken || spinning) return;   // cancelled by next spin
+      const t = (now - start) / 1000;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+      drawReelsWithGlow(cells, pulse);
+      if (winLines.length) drawWinLine(winLines[Math.floor(t * 3) % winLines.length].line);
+      if (t < 2.4) requestAnimationFrame(frame);
+      else { drawReelsWithGlow(cells, 0); winLines.forEach(function(wl) { drawWinLine(wl.line); }); }
+    })(start);
+  }
+
+  // Jackpot meters tick up (odometer) toward their live pool values.
+  function animateNumber(el, to) {
+    if (!el) return;
+    const cur = parseInt((el.textContent || '0').replace(/[^0-9]/g, '')) || 0;
+    to = Math.floor(to);
+    if (cur === to) { el.textContent = '$' + to.toLocaleString(); return; }
+    countUp(el, cur, to, 600, function(v) { return '$' + v.toLocaleString(); });
+  }
+  function renderJackpots() {
+    animateNumber(document.getElementById('jackpotGrand'), jackpotPools.grand);
+    animateNumber(document.getElementById('jackpotMajor'), jackpotPools.major);
+    animateNumber(document.getElementById('jackpotMinor'), jackpotPools.minor);
+    animateNumber(document.getElementById('jackpotMini'), jackpotPools.mini);
+  }
+
+  // ===================== RESULT PROCESSING =====================
+  function onReelsStopped() {
+    reelWrap.classList.remove('spinning', 'anticipation');
+    const wins = evaluatePaylines();
+    const winLines = wins.filter(function(w) { return !w.isScatter; });
+    let totalWin = 0;
+    winLines.forEach(function(w) { totalWin += Math.floor(betAmount / 20 * w.pay * 20); });
 
     if (freeSpinsLeft > 0 && totalWin > 0) {
       totalWin = Math.floor(totalWin * 2);
     }
 
-    if (totalWin > 0 && !isMiniWin) {
-      drawWinHighlights(wins.filter(function(w) { return !w.isScatter; }));
-      if (totalWin >= betAmount * 5) {
-        sound.jackpot();
-        const pt = new CasinoEngine.ParticleSystem();
-        pt.burst(60, ['#ffd700','#c084fc','#a855f7','#fbbf24']);
-      } else if (totalWin >= betAmount * 2) {
-        sound.bigWin();
-        const pt = new CasinoEngine.ParticleSystem();
-        pt.burst(30, ['#c084fc','#ffd700']);
-      } else {
-        sound.win();
-      }
-      resultLine.textContent = 'WIN $' + totalWin + '!';
-      resultLine.className = 'result-line win';
-    } else if (isMiniWin) {
-      sound.win();
-      showBanner(miniWinDisplay, 'Mini Win! $' + totalWin, 3000);
-      resultLine.textContent = 'Mini Win! $' + totalWin;
-      resultLine.className = 'result-line win';
+    const isMiniWin = false; // LDWs removed — a "win" must be a real payline win.
+
+    if (totalWin > 0) {
+      celebrateWin(totalWin, winLines);
     } else {
       sound.lose();
-      resultLine.textContent = 'No win. Try again!';
+      resultLine.textContent = 'No win — spin again';
       resultLine.className = 'result-line';
     }
 
@@ -1018,10 +1148,7 @@ window.__APP__ = {
         if (data.ok) {
           jackpotPools = data.pools || jackpotPools;
           window.__jackpotConfig = data.config || {};
-          document.getElementById('jackpotGrand').textContent = '$' + Math.floor(jackpotPools.grand).toLocaleString();
-          document.getElementById('jackpotMajor').textContent = '$' + Math.floor(jackpotPools.major).toLocaleString();
-          document.getElementById('jackpotMinor').textContent = '$' + Math.floor(jackpotPools.minor).toLocaleString();
-          document.getElementById('jackpotMini').textContent = '$' + Math.floor(jackpotPools.mini).toLocaleString();
+          renderJackpots();
         }
       });
   }
@@ -1054,6 +1181,7 @@ window.__APP__ = {
       jackpotPools.major += feed * 0.25;
       jackpotPools.minor += feed * 0.15;
       jackpotPools.mini += feed * 0.10;
+      renderJackpots();
     } else {
       currentBetId = 'freespin_' + Date.now();
       betAmount = parseInt(betInput.value) || CasinoEngine.MIN_BET;
@@ -1067,15 +1195,6 @@ window.__APP__ = {
     spinReels();
 
     if (freeSpinsLeft <= 0) {
-      const realWins = evaluatePaylines().filter(function(w) { return !w.isScatter; });
-      const hasRealWin = realWins.some(function(w) {
-        return SYMBOLS[w.symbol].pay[Math.min(w.count,4)] * (betAmount/20) >= betAmount;
-      });
-
-      if (!hasRealWin) {
-        forceNearMiss();
-        forceMiniWin();
-      }
       applyGeniesBlessing();
     }
 
