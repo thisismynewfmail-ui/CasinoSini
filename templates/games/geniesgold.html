@@ -598,6 +598,41 @@ window.__APP__ = {
     return null;
   }
 
+  // ===================== SYMBOL ARTWORK =====================
+  // Each symbol can be a real image. Drop /static/img/slots/<id>.svg (or set
+  // SYMBOL_IMG_EXT to '.png' and drop <id>.png) and it is used automatically.
+  // Until an image loads — or if a file is missing — the Unicode glyph is
+  // drawn instead, so the reels always render.
+  const SYMBOL_IMG_BASE = '/static/img/slots/';
+  const SYMBOL_IMG_EXT = '.svg';
+  function preloadSymbolImages() {
+    SYMBOLS.forEach(function(sym) {
+      const im = new Image();
+      im.onload = function() { sym.image = im; sym.imgReady = true; if (!spinning) drawReels(); };
+      im.onerror = function() { sym.imgReady = false; };
+      im.src = SYMBOL_IMG_BASE + sym.id + SYMBOL_IMG_EXT;
+    });
+  }
+
+  // Paint one symbol as artwork (fitted, centered) or fall back to its glyph.
+  // The caller's shadow/alpha (glow + motion blur) apply to either path.
+  function paintSymbol(sym, cx, cy, scale) {
+    if (sym.imgReady && sym.image) {
+      const box = (Math.min(cellW, cellH) - 8) * scale;
+      const iw = sym.image.naturalWidth || box;
+      const ih = sym.image.naturalHeight || box;
+      const rr = Math.min(box / iw, box / ih);
+      const w = iw * rr, h = ih * rr;
+      ctx.drawImage(sym.image, cx - w / 2, cy - h / 2, w, h);
+    } else {
+      ctx.fillStyle = sym.color;
+      ctx.font = 'bold ' + Math.floor(cellH * 0.5 * scale) + 'px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(sym.label, cx, cy);
+    }
+  }
+
   // ===================== DRAWING =====================
   function drawReels() {
     const w = canvas.width / 2;
@@ -635,11 +670,7 @@ window.__APP__ = {
           ctx.shadowBlur = 12;
         }
 
-        ctx.fillStyle = sym.color;
-        ctx.font = 'bold ' + Math.floor(cellH * 0.5) + 'px system-ui';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(sym.label, x + cellW / 2 - 1, y + cellH / 2);
+        paintSymbol(sym, x + cellW / 2 - 1, y + cellH / 2, 1);
 
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
@@ -916,11 +947,7 @@ window.__APP__ = {
           ctx.shadowColor = sym.color;
           ctx.shadowBlur = 12;
         }
-        ctx.fillStyle = sym.color;
-        ctx.font = 'bold ' + Math.floor(cellH * 0.5 * scale) + 'px system-ui';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(sym.label, x + cellW / 2 - 1, y + cellH / 2);
+        paintSymbol(sym, x + cellW / 2 - 1, y + cellH / 2, scale);
         ctx.shadowBlur = 0;
       }
     }
@@ -1296,6 +1323,7 @@ window.__APP__ = {
 
   // ===================== INIT =====================
   resize();
+  preloadSymbolImages();
   window.addEventListener('resize', resize);
   fetchJackpots();
   setInterval(fetchJackpots, 30000);
